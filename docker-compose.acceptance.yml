@@ -1,0 +1,53 @@
+# DocRAG 隔离验收 Compose（沿用原任务的 Docker 约束）
+#
+# - project 名: docrag-acceptance（与旧 docrag 项目完全隔离）
+# - 端口:     127.0.0.1:3302（唯一宿主入口，前端 80 -> 3302）
+# - 卷:       draccept_data / draccept_models（绝不使用/挂载原 docrag_docrag_* 卷）
+# - 网络:     draccept_net（由 project 自动命名）
+# - 默认 MOCK 离线模式；真实模型切换见 backend 环境变量（RAG_*_MOCK=false）
+#
+# 用法：
+#   docker compose -f docker-compose.acceptance.yml build
+#   docker compose -f docker-compose.acceptance.yml up -d --wait
+#   docker compose -f docker-compose.acceptance.yml down   # 不带 -v，保留数据卷
+#   或使用 scripts/docker/ 下的一键脚本
+
+name: docrag-acceptance
+
+services:
+  backend:
+    build: ./backend
+    environment:
+      RAG_DATA_DIR: /data
+      RAG_DB_PATH: /data/app.db
+      RAG_MODEL_DIR: /models
+      RAG_LLM_MOCK: "true"
+      RAG_EMBED_MOCK: "true"
+      RAG_RERANK_MOCK: "true"
+      RAG_PARSE_MOCK: "true"
+      RAG_PORT: "8000"
+      # 信任 nginx 注入的身份头（X-Rag-Tenant/User/Group），浏览器无法伪造
+      RAG_TRUSTED_PROXY: "true"
+    volumes:
+      - draccept_data:/data
+      - draccept_models:/models
+      - ./work:/work   # 评测工作目录（NIST PDF 缓存与评测报告，持久化）
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health',timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "127.0.0.1:3302:80"
+    restart: unless-stopped
+
+volumes:
+  draccept_data:
+  draccept_models:
