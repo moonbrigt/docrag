@@ -1,0 +1,7 @@
+# 公开评测（NIST 数据集）专用依赖：在 requirements.txt + requirements-dev.txt 之上追加。
+# 说明：
+# - pypdf：PDF 页文本提取（gold evidence 验证与语料构建的依赖）。
+# - numpy：bootstrap CI（requirements.txt 已带，这里显式列出以防单独安装）。
+# - 评测基线为纯 Python 确定性实现（BM25/词法重排/抽取式答案），不需要任何模型权重或密钥。
+pypdf>=3.0,<7.0
+numpy>=1.24

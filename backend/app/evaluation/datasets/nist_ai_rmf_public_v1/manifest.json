@@ -1,0 +1,49 @@
+{
+  "id": "nist_ai_rmf_public_v1",
+  "name": "NIST AI RMF 公开评测集 v1（自建问题与页码 gold）",
+  "description": "基于两份 NIST Technical Series 公开 PDF（NIST.AI.100-1 人工智能风险管理框架 AI RMF 1.0、NIST.AI.600-1 生成式 AI 跨部门配置文件）构建的真实公开文档评测集。18 条测试题（16 answerable + 2 unanswerable），gold 页码为人工映射的物理页证据，问题为本项目自建，不是 NIST 官方 benchmark。",
+  "profile": "public_nist",
+  "sources": [
+    {
+      "document_id": "NIST.AI.100-1",
+      "filename": "NIST.AI.100-1.pdf",
+      "doi": "https://doi.org/10.6028/NIST.AI.100-1",
+      "url": "https://doi.org/10.6028/NIST.AI.100-1",
+      "license": "NIST Open License（美国政府公共领域作品，可自由使用/再分发）",
+      "license_url": "https://www.nist.gov/open/license",
+      "sha256": "7576edb531d9848825814ee88e28b1795d3a84b435b4b797d3670eafdc4a89f1",
+      "size_bytes": 1946127,
+      "page_count": 48,
+      "physical_page": "physical_page 为 1 起算的 PDF 物理页（含封面）。正文印刷页码映射：printed = physical - 5（如物理 p6 = 印刷 p1）；罗马序页 i/ii 对应物理 p4/p5；物理 p1-p3 无印刷页码（封面/版权页/公告页）。",
+      "content_start_page": 6
+    },
+    {
+      "document_id": "NIST.AI.600-1",
+      "filename": "NIST.AI.600-1.pdf",
+      "doi": "https://doi.org/10.6028/NIST.AI.600-1",
+      "url": "https://doi.org/10.6028/NIST.AI.600-1",
+      "license": "NIST Open License（美国政府公共领域作品，可自由使用/再分发）",
+      "license_url": "https://www.nist.gov/open/license",
+      "sha256": "6e73620ab6b64e90ef2c04bf0e0d6246185a2f4b1b13cab0df494496cff89b6a",
+      "size_bytes": 1174643,
+      "page_count": 64,
+      "physical_page": "physical_page 为 1 起算的 PDF 物理页（含封面）。正文印刷页码映射：printed = physical - 4（如物理 p5 = 印刷 p1）；物理 p1-p4 无印刷页码（封面/标题页/About 页/目录页）。",
+      "content_start_page": 5
+    }
+  ],
+  "n_questions": 18,
+  "answerable_count": 16,
+  "unanswerable_count": 2,
+  "split": {"test": 18, "dev": 0, "train": 0},
+  "notes": [
+    "本数据集的问题、gold 答案与页码映射均为本项目自建（created_by: docrag-dataset-eval），不是 NIST 官方 benchmark；NIST 未背书任何问答对。",
+    "gold_pages.evidence 均为对应 physical_page 上 pypdf 提取文本中逐字存在的原文片段，由 public_dataset.py 程序化校验（fail-closed）。",
+    "样本量小（18 题 / 112 页），题目侧重风险定义、结构清单与关键事实，不构成对任意 RAG 系统在任意文档上 OCR/解析泛化能力的结论。",
+    "unanswerable 题（nist-u01/nist-u02）已通过全文关键词扫描验证与文档内容无关。",
+    "PDF 文件不随仓库分发（许可证允许再分发但为控制仓库体积）；scripts/evaluation/download.sh 从 DOI 确定性下载并做 SHA-256 校验，缓存于 work/source_cache/。",
+    "gold 数据绝不进入检索/生成管线：baseline 只接收 corpus + query。"
+  ],
+  "created_by": "docrag-dataset-eval",
+  "version": "1.0.0",
+  "created_at": "2026-08-12"
+}
