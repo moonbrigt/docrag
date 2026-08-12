@@ -1,0 +1,22 @@
+# Python（后端）
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# 运行时数据（首次运行自动生成）
+data/
+app.db
+models/
+*.pdf
+!backend/app/tests/**/*.pdf
+
+# 环境与密钥
+.env
+
+# 前端（frontend/.gitignore 已覆盖 node_modules/dist 等）
+
+# 公开评测工作区（PDF 缓存、语料与报告产物，不进仓库）
+work/
+
