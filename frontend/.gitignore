@@ -1,0 +1,8 @@
+node_modules
+dist
+dist-ssr
+.npmcache
+install.log
+*.local
+.DS_Store
+.vite

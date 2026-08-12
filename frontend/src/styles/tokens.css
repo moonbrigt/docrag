@@ -1,0 +1,199 @@
+/* =========================================================================
+ * DocRAG 设计 Token（唯一色彩真相源）
+ * 来源：src/design/design-tokens.json + DESIGN.md §2
+ * 主题切换：<html data-theme="dark|light"> 翻转整套变量，组件零改动。
+ * 组件内禁止裸写 hex（#fff/#000 例外，但深色也不用纯黑）。
+ * ========================================================================= */
+
+/* ---------- Dark（默认） ---------- */
+:root,
+[data-theme='dark'] {
+  /* 中性画布 / 表面 */
+  --bg: #0b0d10;
+  --surface: #131619;
+  --surface-2: #1a1d21;
+  --surface-3: #21252b;
+
+  /* 文本 */
+  --fg: #eceae6;
+  --muted: #9ba1a8;
+  --meta: #6b7178;
+
+  /* 发丝边框 */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-soft: rgba(255, 255, 255, 0.05);
+
+  /* 单一精炼靛蓝强调（区别于 Tailwind 默认 #6366f1） */
+  --accent: #3e63dd;
+  --accent-on: #ffffff;
+  --accent-hover: #3757c2;
+  --accent-active: #324fb1;
+  --focus-ring: 0 0 0 3px rgba(62, 99, 221, 0.4);
+
+  /* 语义状态 */
+  --success: #3fb950;
+  --warn: #e8833a;
+  --danger: #f85149;
+
+  /* 签名琥珀（PDF 页码引用高亮，与 accent 冷暖对比） */
+  --citation: #f5b544;
+  --citation-bg: rgba(245, 181, 68, 0.14);
+  --citation-fill: rgba(245, 181, 68, 0.28);
+  --citation-ring: rgba(245, 181, 68, 0.45);
+
+  color-scheme: dark;
+}
+
+/* ---------- Light（第二主题） ---------- */
+[data-theme='light'] {
+  --bg: #f9fafb;
+  --surface: #ffffff;
+  --surface-2: #f3f4f6;
+  --surface-3: #e9ebee;
+
+  --fg: #111827;
+  --muted: #5b6470;
+  --meta: #9ca3af;
+
+  --border: rgba(0, 0, 0, 0.08);
+  --border-soft: rgba(0, 0, 0, 0.05);
+
+  --accent: #3e63dd;
+  --accent-on: #ffffff;
+  --accent-hover: #3757c2;
+  --accent-active: #324fb1;
+  --focus-ring: 0 0 0 3px rgba(62, 99, 221, 0.4);
+
+  --success: #16a34a;
+  --warn: #b45309;
+  --danger: #dc2626;
+
+  --citation: #9a6a0e;
+  --citation-bg: rgba(245, 181, 68, 0.22);
+  --citation-fill: rgba(245, 181, 68, 0.3);
+  --citation-ring: rgba(154, 106, 14, 0.35);
+
+  color-scheme: light;
+}
+
+/* ---------- 字体 / 形状 / 运动（两主题共用） ---------- */
+:root {
+  --font-display: 'Inter', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 9999px;
+
+  --text-xs: 0.75rem; /* 12px */
+  --text-sm: 0.875rem; /* 14px */
+  --text-base: 1rem; /* 16px */
+  --text-md: 1.125rem; /* 18px */
+  --text-lg: 1.25rem; /* 20px */
+  --text-xl: 1.5rem; /* 24px */
+  --text-2xl: 2rem; /* 32px */
+  --text-3xl: 2.5rem; /* 40px */
+
+  --weight-read: 400;
+  --weight-emphasize: 510;
+  --weight-announce: 590;
+
+  --tracking-tight: -0.01em;
+  --tracking-display: -0.02em;
+  --tracking-caps: 0.06em;
+  --tracking-normal: 0;
+
+  --leading-tight: 1.15;
+  --leading-snug: 1.3;
+  --leading-body: 1.5;
+  --leading-relaxed: 1.65;
+
+  --motion-fast: 150ms;
+  --motion-base: 200ms;
+  --motion-slow: 300ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  --shadow-elev-ring: 0 0 0 1px var(--border);
+  --shadow-elev-raised: 0 0 40px rgba(0, 0, 0, 0.45);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+
+  --container-max: 1200px;
+}
+
+/* ---------- 基础元素层 ---------- */
+*,
+*::before,
+*::after {
+  border-color: var(--border);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  font-feature-settings: 'cv01', 'ss03';
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background-color var(--motion-base) var(--ease-standard);
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+::selection {
+  background-color: color-mix(in srgb, var(--accent) 34%, transparent);
+  color: var(--fg);
+}
+
+/* 细滚动条，贴合暗色 chrome */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: var(--radius-pill);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--meta);
+}
+
+/* ---------- 尊重 prefers-reduced-motion（P0 兜底） ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

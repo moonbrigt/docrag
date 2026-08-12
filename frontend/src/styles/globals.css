@@ -1,0 +1,132 @@
+/* =========================================================================
+ * DocRAG 全局样式入口
+ * Tailwind 4（@tailwindcss/vite） + 设计 Token 映射（@theme inline）。
+ * 组件只使用下方由 --token 生成的工具类，禁止裸 hex。
+ * ========================================================================= */
+
+@import 'tailwindcss';
+@import './tokens.css';
+
+/* 将设计 Token 映射到 Tailwind 工具类（@theme inline 直接引用 CSS 变量，
+   运行时随 data-theme 翻转，不生成多余变量）。 */
+@theme inline {
+  /* 中性 */
+  --color-canvas: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-meta: var(--meta);
+  --color-line: var(--border);
+  --color-line-soft: var(--border-soft);
+
+  /* 强调 / 语义 */
+  --color-accent: var(--accent);
+  --color-accent-on: var(--accent-on);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-active: var(--accent-active);
+  --color-success: var(--success);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --color-citation: var(--citation);
+  --color-citation-bg: var(--citation-bg);
+  --color-citation-fill: var(--citation-fill);
+  --color-citation-ring: var(--citation-ring);
+
+  /* 字体 */
+  --font-sans: var(--font-display);
+  --font-mono: var(--font-mono);
+
+  /* 字号（覆盖默认 Tailwind 比例，对齐 DESIGN.md §3） */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-md: 1.125rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 2rem;
+  --text-3xl: 2.5rem;
+
+  /* 字重 */
+  --font-weight-read: 400;
+  --font-weight-emphasize: 510;
+  --font-weight-announce: 590;
+
+  /* 字距 */
+  --tracking-tight: -0.01em;
+  --tracking-display: -0.02em;
+  --tracking-caps: 0.06em;
+  --tracking-normal: 0;
+
+  /* 行高 */
+  --leading-tight: 1.15;
+  --leading-snug: 1.3;
+  --leading-body: 1.5;
+  --leading-relaxed: 1.65;
+
+  /* 圆角 */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 9999px;
+
+  /* 运动 */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /* 阴影（仅弹层/对话使用） */
+  --shadow-elev-ring: 0 0 0 1px var(--border);
+  --shadow-elev-raised: 0 0 40px rgba(0, 0, 0, 0.45);
+
+  /* 动画（P0：尊重 prefers-reduced-motion） */
+  --animate-fade-in: fade-in 150ms var(--ease-standard);
+  --animate-slide-in-right: slide-in-right 200ms var(--ease-standard);
+  --animate-pulse-cite: pulse-cite 220ms var(--ease-standard);
+}
+
+/* ---- 关键帧（与上方 --animate-* 对应） ---- */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes pulse-cite {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.03);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes blink-caret {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+/* 小工具：全大写语义标签（状态徽章等），强制 0.06em 字距 */
+@utility caps-label {
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  font-weight: var(--weight-emphasize);
+}
