@@ -1,0 +1,19 @@
+# DocRAG 后端「轻量运行时」依赖（锁定版本见 Spec §4）。
+# 仅含离线 MOCK 演示所必需的部分；compose 默认 RAG_*_MOCK=true，无需下载任何大模型权重。
+# 切换到真实模型（bge-m3 / bge-reranker-v2-m3 / docling）时，另行安装 requirements-ml.txt。
+fastapi==0.115.13
+pydantic>=2.11,<3
+uvicorn>=0.30
+gunicorn>=22
+pydantic-settings>=2.3
+python-multipart>=0.0.9
+numpy>=1.24
+
+# 向量检索（CPU 版，纯 pip  wheel）
+faiss-cpu==1.14.3
+
+# 双后端 LLM 客户端（base_url 切换 Ollama / OpenAI 兼容；仅 import，不下载权重）
+openai>=1.40
+
+# 注：开发 / 测试依赖（pytest / httpx / ruff）见 requirements-dev.txt，不进生产镜像。
+# 注：真实模型依赖（torch / docling / flag-embedding / sentence-transformers）见 requirements-ml.txt。
