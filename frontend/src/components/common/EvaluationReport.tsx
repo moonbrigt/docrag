@@ -143,18 +143,16 @@ export function EvaluationReportView({ report }: { report: EvaluationReport }) {
                 </thead>
                 <tbody>
                   {report.per_query.map((q) => {
-                    const r5 = num(m, undefined, undefined) ? (q as unknown as Record<string, unknown>)['recall@5'] : undefined;
-                    const recall = typeof r5 === 'number' ? r5 : undefined;
-                    const mrr = (q as unknown as Record<string, unknown>)['mrr'];
-                    const answerScore = (q as unknown as Record<string, unknown>)['answer_score'];
+                    const qrec = q as unknown as Record<string, unknown>;
+                    const recall =
+                      typeof qrec['recall@5'] === 'number' ? (qrec['recall@5'] as number) : undefined;
+                    const mrr = qrec['mrr'];
+                    const answerScore = qrec['answer_score'];
                     const hasAnswer =
                       typeof answerScore === 'number'
                         ? answerScore > 0
-                        : (q as unknown as Record<string, unknown>).hit === true;
-                    const qText =
-                      (q as unknown as Record<string, unknown>).query ??
-                      (q as unknown as Record<string, unknown>).question ??
-                      (q as unknown as Record<string, unknown>).id;
+                        : qrec.hit === true;
+                    const qText = qrec.query ?? qrec.question ?? qrec.id;
                     return (
                       <tr key={q.id} className="border-b border-line/60 last:border-0 align-top">
                         <td className="px-3 py-2 font-mono text-xs text-fg">{q.id}</td>
@@ -177,9 +175,7 @@ export function EvaluationReportView({ report }: { report: EvaluationReport }) {
                           </Badge>
                         </td>
                         <td className="px-3 py-2 text-xs text-muted">
-                          {Array.isArray((q as unknown as Record<string, unknown>).citations)
-                            ? `${(q.citations as unknown[]).length} 条`
-                            : '—'}
+                          {Array.isArray(qrec.citations) ? `${(qrec.citations as unknown[]).length} 条` : '—'}
                         </td>
                       </tr>
                     );

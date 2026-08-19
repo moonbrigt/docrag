@@ -107,22 +107,26 @@ def run(dataset: dict | None = None, config: dict | None = None) -> dict:
         top_set = set(page_nos[:cite_K])
         hit = bool(E & top_set)
         cite_hit += 1.0 if hit else 0.0
+        # 每题指标随明细下发：明细行与概览聚合同源，可逐条核对（避免概览=孤岛）
+        per_q: dict = {
+            "id": q["id"],
+            "query": q["query"],
+            "answer_type": q.get("answer_type") or q.get("type"),
+            "expected_pages": q["expected_pages"],
+            "retrieved_pages": page_nos[:cite_K],
+            "citations": page_nos[:cite_K],
+            "hit": hit,
+        }
         for k in Ks:
             topk = set(page_nos[:k])
             inter = len(E & topk)
             recall_sum[k] += inter / len(E) if E else 0.0
             hit_sum[k] += 1.0 if inter > 0 else 0.0
+            per_q[f"recall@{k}"] = inter / len(E) if E else 0.0
         rank = next((i for i, pn in enumerate(page_nos, start=1) if pn in E), None)
         mrr_sum += 1.0 / rank if rank else 0.0
-        per_query.append(
-            {
-                "id": q["id"],
-                "query": q["query"],
-                "expected_pages": q["expected_pages"],
-                "retrieved_pages": page_nos[:cite_K],
-                "hit": hit,
-            }
-        )
+        per_q["mrr"] = 1.0 / rank if rank else 0.0
+        per_query.append(per_q)
 
     metrics = {
         "citation_accuracy": cite_hit / n if n else 0.0,

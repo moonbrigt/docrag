@@ -17,6 +17,7 @@ name: docrag-acceptance
 services:
   backend:
     build: ./backend
+    image: docrag-acceptance-backend:real
     environment:
       RAG_DATA_DIR: /data
       RAG_DB_PATH: /data/app.db
