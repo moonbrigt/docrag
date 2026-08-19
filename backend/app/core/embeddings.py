@@ -52,7 +52,7 @@ class EmbeddingService:
         with self._lock:
             if self._model is None:
                 try:
-                    from flag_embedding import BGEM3FlagModel
+                    from FlagEmbedding import BGEM3FlagModel
 
                     model_id = "BAAI/bge-m3"
                     local = f"{_settings.MODEL_DIR.rstrip('/')}/bge-m3"
@@ -78,12 +78,16 @@ class EmbeddingService:
 
         out = self._model.encode(
             texts,
-            max_length=8192,
+            # HybridChunker 已限制 chunk ≤512 token，1024 即可覆盖且不拖慢弱卡
+            max_length=1024,
             return_dense=True,
             return_sparse=True,
-            return_colbert=False,
+            return_colbert_vecs=False,
+            # 4GB 卡：batch=4 比 8 更快（规避显存抖动）且留足余量，避免 OOM
+            batch_size=4,
         )
-        dense = [np.asarray(v, dtype=np.float32) for v in out["dense"]]
+        # BGEM3FlagModel 输出键为 dense_vecs / lexical_weights / colbert_vecs
+        dense = [np.asarray(v, dtype=np.float32) for v in out["dense_vecs"]]
         sparse = out["lexical_weights"]
         return dense, sparse
 
