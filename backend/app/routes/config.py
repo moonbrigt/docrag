@@ -13,8 +13,7 @@ from typing import Literal, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from app.core import runtime_config
-from app.core.accelerator import accelerator
+from app.core import runtime_config, accelerator
 from app.core.llm import effective_llm_config
 from app.services import index_service, rerank_service
 
