@@ -34,6 +34,11 @@ class RerankService:
     def is_ready(self) -> bool:
         return self.status()[1]
 
+    def reload(self) -> None:
+        """丢弃已加载模型，下次调用按最新计算加速档位重建（GPU 开关热生效）。"""
+        self._model = None
+        self._load_error = None
+
     def _ensure(self):
         if self._model is not None:
             return self._model
@@ -44,12 +49,15 @@ class RerankService:
                 try:
                     from sentence_transformers import CrossEncoder
 
+                    from app.core import accelerator
+
                     model_id = "BAAI/bge-reranker-v2-m3"
                     local = f"{_settings.MODEL_DIR.rstrip('/')}/bge-reranker-v2-m3"
+                    device = accelerator.device()
                     try:
-                        self._model = CrossEncoder(local)
+                        self._model = CrossEncoder(local, device=device)
                     except Exception:
-                        self._model = CrossEncoder(model_id)
+                        self._model = CrossEncoder(model_id, device=device)
                 except Exception as exc:
                     # 真实后端加载失败：仅显式 mock 才降级；否则保持未就绪 -> 503
                     self._load_error = str(exc)

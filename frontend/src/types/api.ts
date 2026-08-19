@@ -217,6 +217,8 @@ export interface EvaluationRunConfig {
 }
 
 // ---- 运行时配置（设置页）----
+export type AcceleratorMode = 'auto' | 'cuda' | 'cpu';
+
 export interface RuntimeLlmConfig {
   backend: 'mock' | 'ollama' | 'openai';
   base_url: string;
@@ -227,6 +229,11 @@ export interface RuntimeLlmConfig {
 export interface RuntimeConfigResponse {
   llm: RuntimeLlmConfig;
   apply_mode: 'runtime_override';
+  /** 计算加速档位（auto/cuda/cpu），缺失容错 */
+  accelerator?: AcceleratorMode;
+  /** 当前生效设备（'cuda' | 'cpu'），缺失容错 */
+  device?: string;
+  cuda_available?: boolean;
 }
 
 export interface SettingsUpdatePayload {
@@ -236,5 +243,7 @@ export interface SettingsUpdatePayload {
     base_url?: string;
     api_key?: string;
     model?: string;
+    /** 空字符串 = 清除覆盖，回落 env 的 RAG_ACCELERATOR */
+    accelerator?: AcceleratorMode | '';
   };
 }

@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     PARSE_BACKEND: str = "docling"  # docling | mock
     PARSE_MOCK: bool = False
 
+    # 计算加速：auto | cuda | cpu（嵌入/重排设备与精度；可被设置页运行时覆盖）
+    ACCELERATOR: str = "auto"
+
     # LLM 双后端
     LLM_BACKEND: str = "ollama"  # ollama | openai | mock
     LLM_MOCK: bool = False

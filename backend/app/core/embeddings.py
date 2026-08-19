@@ -43,6 +43,11 @@ class EmbeddingService:
     def is_ready(self) -> bool:
         return self.status()[1]
 
+    def reload(self) -> None:
+        """丢弃已加载模型，下次调用按最新计算加速档位重建（GPU 开关热生效）。"""
+        self._model = None
+        self._load_error = None
+
     # ---- 懒加载真实模型 ----
     def _ensure(self):
         if self._model is not None:
@@ -54,13 +59,21 @@ class EmbeddingService:
                 try:
                     from FlagEmbedding import BGEM3FlagModel
 
+                    from app.core import accelerator
+
                     model_id = "BAAI/bge-m3"
                     local = f"{_settings.MODEL_DIR.rstrip('/')}/bge-m3"
+                    device = accelerator.device()
+                    fp16 = accelerator.use_fp16()
                     try:
-                        self._model = BGEM3FlagModel(local, use_fp16=False)
+                        self._model = BGEM3FlagModel(
+                            local, use_fp16=fp16, devices=device
+                        )
                     except Exception:
                         # 本地不存在则回退到 HF 自动拉取
-                        self._model = BGEM3FlagModel(model_id, use_fp16=False)
+                        self._model = BGEM3FlagModel(
+                            model_id, use_fp16=fp16, devices=device
+                        )
                 except Exception as exc:
                     # 真实后端加载失败（权重缺失/未安装）：仅当显式开启 mock 才降级；
                     # 否则保持未就绪，由调用方返回 503（不静默替换模型）。

@@ -14,11 +14,11 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app.core import runtime_config
+from app.core.accelerator import accelerator
 from app.core.llm import effective_llm_config
+from app.services import index_service, rerank_service
 
 router = APIRouter(prefix="/api/v1", tags=["config"])
-
-_LLM_BACKENDS = Literal["mock", "ollama", "openai"]
 
 
 class LlmSettingsIn(BaseModel):
@@ -27,6 +27,8 @@ class LlmSettingsIn(BaseModel):
     base_url: Optional[str] = None
     api_key: Optional[str] = None
     model: Optional[str] = None
+    # 计算加速档位（嵌入/重排 GPU 开关）；空串 = 回落 env 默认
+    accelerator: Optional[Literal["auto", "cuda", "cpu", ""]] = None
 
 
 class SettingsIn(BaseModel):
@@ -36,7 +38,13 @@ class SettingsIn(BaseModel):
 @router.get("/config/settings")
 async def get_settings():
     cfg = effective_llm_config()
-    return {"llm": cfg, "apply_mode": "runtime_override"}
+    return {
+        "llm": cfg,
+        "apply_mode": "runtime_override",
+        "accelerator": accelerator.requested(),
+        "device": accelerator.device(),
+        "cuda_available": accelerator.cuda_available(),
+    }
 
 
 @router.put("/config/settings")
@@ -51,6 +59,8 @@ async def put_settings(req: SettingsIn):
         pairs["llm_api_key"] = llm.api_key.strip()
     if llm.model is not None:
         pairs["llm_model"] = llm.model.strip()
+    if llm.accelerator is not None:
+        pairs["accelerator"] = llm.accelerator
     if not pairs:
         raise HTTPException(status_code=400, detail="没有可更新的配置项")
 
@@ -59,4 +69,9 @@ async def put_settings(req: SettingsIn):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"配置持久化失败：{exc}")
 
-    return {"ok": True, "llm": effective_llm_config()}
+    # 计算加速档位变更：丢弃已加载的嵌入/重排模型，下次调用按新设备重建
+    if "accelerator" in pairs:
+        index_service.get_embedder().reload()
+        rerank_service.get_reranker().reload()
+
+    return {"ok": True, **await get_settings()}

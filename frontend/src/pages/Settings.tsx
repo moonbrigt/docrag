@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Cpu, KeyRound, RefreshCw, Save } from 'lucide-react';
+import { Cpu, Gauge, KeyRound, RefreshCw, Save } from 'lucide-react';
 import { getRuntimeConfig, updateRuntimeConfig } from '@/api/config';
 import { useBackends } from '@/hooks/useSystem';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
+import type { AcceleratorMode } from '@/types/api';
 
 // 设置页：模型 API 运行时配置（写回后端，即时生效，无需改 env / 重建镜像）。
 // embedding / rerank / 解析后端仍由后端环境变量决定，此处只读展示就绪状态。
@@ -13,6 +14,39 @@ const BACKEND_OPTIONS = [
   { value: 'ollama', label: 'Ollama（本地）' },
   { value: 'openai', label: 'OpenAI 兼容 API' },
 ] as const;
+
+const ACCELERATOR_OPTIONS = [
+  { value: 'auto', label: '自动（有 GPU 则用，否则 CPU）' },
+  { value: 'cuda', label: 'GPU（CUDA）' },
+  { value: 'cpu', label: '仅 CPU' },
+] as const;
+
+function Select({
+  id,
+  value,
+  onChange,
+  options,
+}: {
+  id: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: ReadonlyArray<{ value: string; label: string }>;
+}) {
+  return (
+    <select
+      id={id}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full rounded-md border border-line bg-surface-2 px-3 py-2 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-accent"
+    >
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 export function Settings() {
   const { data: backends, refetch: refetchBackends } = useBackends();
@@ -24,6 +58,9 @@ export function Settings() {
   const [model, setModel] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [apiKeySet, setApiKeySet] = useState(false);
+  const [accelerator, setAccelerator] = useState<AcceleratorMode>('auto');
+  const [device, setDevice] = useState('');
+  const [cudaAvailable, setCudaAvailable] = useState(false);
 
   useEffect(() => {
     getRuntimeConfig()
@@ -32,6 +69,9 @@ export function Settings() {
         setBaseUrl(cfg.llm.base_url);
         setModel(cfg.llm.model);
         setApiKeySet(cfg.llm.api_key_set);
+        setAccelerator(cfg.accelerator ?? 'auto');
+        setDevice(cfg.device ?? '');
+        setCudaAvailable(!!cfg.cuda_available);
       })
       .catch(() => setMessage({ tone: 'err', text: '读取当前配置失败，请刷新重试' }))
       .finally(() => setLoading(false));
@@ -47,13 +87,16 @@ export function Settings() {
           base_url: baseUrl,
           model,
           api_key: apiKey, // 空串 = 清除已存密钥
+          accelerator,
         },
       });
       setApiKey(''); // 清空输入框，避免明文驻留
       setApiKeySet(cfg.llm.api_key_set);
+      setDevice(cfg.device ?? '');
+      setCudaAvailable(!!cfg.cuda_available);
       setMessage({
         tone: 'ok',
-        text: `已保存并即时生效：LLM 后端 = ${cfg.llm.backend}（模型 ${cfg.llm.model || '未设置'}）`,
+        text: `已保存并即时生效：LLM 后端 = ${cfg.llm.backend}（模型 ${cfg.llm.model || '未设置'}）· 计算设备 = ${cfg.device || '自动'}`,
       });
       refetchBackends();
     } catch (err) {
@@ -84,18 +127,12 @@ export function Settings() {
                 <label htmlFor="llm-backend" className="text-sm text-muted">
                   LLM 后端
                 </label>
-                <select
+                <Select
                   id="llm-backend"
                   value={backend}
-                  onChange={(e) => setBackend(e.target.value as typeof backend)}
-                  className="w-full rounded-md border border-line bg-surface-2 px-3 py-2 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-accent"
-                >
-                  {BACKEND_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => setBackend(v as typeof backend)}
+                  options={BACKEND_OPTIONS}
+                />
               </div>
 
               <div className="space-y-1.5">
@@ -147,6 +184,24 @@ export function Settings() {
                   autoComplete="off"
                 />
                 <p className="text-xs text-meta">仅 Ollama 模式不需要；存储于本地 SQLite，接口不回显明文</p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="llm-accelerator" className="flex items-center gap-1.5 text-sm text-muted">
+                  <Gauge size={14} />
+                  计算加速（嵌入 / 重排）
+                </label>
+                <Select
+                  id="llm-accelerator"
+                  value={accelerator}
+                  onChange={(v) => setAccelerator(v as AcceleratorMode)}
+                  options={ACCELERATOR_OPTIONS}
+                />
+                <p className="text-xs text-meta">
+                  {cudaAvailable
+                    ? `当前生效设备：${device === 'cuda' ? 'GPU（CUDA，FP16）' : 'CPU（FP32）'}。切换后模型热重载，立即生效。`
+                    : '当前环境未检测到 CUDA，将使用 CPU（FP32）计算。'}
+                </p>
               </div>
 
               <div className="flex items-center gap-3">
