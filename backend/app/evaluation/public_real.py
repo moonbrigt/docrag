@@ -24,7 +24,7 @@ from pathlib import Path
 
 import numpy as np
 
-from app.core import accelerator, embeddings, llm, reranker
+from app.core import accelerator, embeddings, llm, reranker, runtime_config
 from app.evaluation import eval_metrics, public_dataset
 from app.evaluation.public_runner import (
     DEFAULT_REPORT,
@@ -248,6 +248,8 @@ def build_report(work_dir: Path, ks=KS) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # CLI 为独立进程，需自行载入设置页写回的运行时覆盖（web 由 lifespan 加载）
+    runtime_config.load_runtime_config()
     parser = argparse.ArgumentParser(prog="public_real",
                                      description="NIST 公开评测：真实完整管线（bge-m3+reranker+Ollama）")
     parser.add_argument("--work-dir", default=str(DEFAULT_WORK_DIR))

@@ -12,6 +12,7 @@ from collections import deque
 import numpy as np
 import pytest
 
+from app.core import runtime_config
 from app.evaluation import eval_metrics, public_real
 from app.evaluation.public_real import NO_ANSWER_TOKEN
 
@@ -116,3 +117,18 @@ def test_aggregate_derivable_from_per_query():
     ans_rows = [r for r in rows if not r["unanswerable"]]
     assert metrics["recall@1"] == pytest.approx(
         sum(r["recall@1"] for r in ans_rows) / len(ans_rows))
+
+
+def test_cli_entry_loads_runtime_overrides(monkeypatch):
+    """CLI（独立进程）须载入设置页写回的覆盖，与 web 看板评测一致，否则回落 env。"""
+    called = False
+
+    def fake_load():
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr(runtime_config, "load_runtime_config", fake_load)
+    # --help 会在参数解析时 SystemExit，但在那之前 load 已执行
+    with pytest.raises(SystemExit):
+        public_real.main(["--help"])
+    assert called is True
