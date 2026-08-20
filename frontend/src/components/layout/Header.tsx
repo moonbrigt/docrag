@@ -10,7 +10,7 @@ export function Header() {
         <span className="text-md font-announce text-fg">DocRAG</span>
       </div>
       <div className="hidden text-sm text-meta md:block">
-        私有部署 · 带精准页码溯源的文档问答
+        本地部署 · 带精准页码溯源的文档问答
       </div>
       <div className="flex items-center gap-2">
         <ThemeToggle />

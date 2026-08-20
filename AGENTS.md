@@ -1,6 +1,6 @@
 # AGENTS.md — DocRAG 开发指引（WSL 原生）
 
-可私有部署的文档 RAG Web 应用（React 前端 + FastAPI 后端）：PDF 上传 → Docling 解析（page_no+bbox 溯源）→ 结构化分块 → FAISS+FTS5 混合检索 → 重排 → 带页码引用回答 → PDF 高亮跳转。
+可本地部署的文档 RAG Web 应用（React 前端 + FastAPI 后端）：PDF 上传 → Docling 解析（page_no+bbox 溯源）→ 结构化分块 → FAISS+FTS5 混合检索 → 重排 → 带页码引用回答 → PDF 高亮跳转。
 **修改前必读**：本文档 + `docs/README.md`（唯一事实来源索引）。
 
 ## 运行环境（2026-08 迁移后现状）

@@ -1,6 +1,6 @@
 # DocRAG 系统架构
 
-> 文档 RAG Web 应用（DocRAG）— 可私有部署、带精准页码溯源
+> 文档 RAG Web 应用（DocRAG）— 可本地部署、带精准页码溯源
 > 技术栈：React 19 + Vite + FastAPI + Docling + bge-m3 + FAISS/SQLite + bge-reranker + pdf.js
 
 ## 1. 分层架构图

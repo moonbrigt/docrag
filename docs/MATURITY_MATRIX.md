@@ -103,7 +103,7 @@
 
 | 项 | 状态 | 实现与证据（代码位置） |
 |----|------|----------------------|
-| 深度 OCR（扫描件） | ⬜ | 未实现且有原因：MVP 聚焦可提取文本 PDF（Spec §3 明确不做「扫描件深度 OCR」）；评测语料为文本型 PDF，**无 OCR 评分**；真实 Docling OCR extra 路径未验证（provenance `NOT_RUN`）。市场对照：Google Document AI OCR 为托管服务，本地私有部署采用 Docling OCR extra 需另行评估 |
+| 深度 OCR（扫描件） | ⬜ | 未实现且有原因：MVP 聚焦可提取文本 PDF（Spec §3 明确不做「扫描件深度 OCR」）；评测语料为文本型 PDF，**无 OCR 评分**；真实 Docling OCR extra 路径未验证（provenance `NOT_RUN`）。市场对照：Google Document AI OCR 为托管服务，本地采用 Docling OCR extra 需另行评估 |
 | 布局（结构化分块） | ✅ | Docling HybridChunker 结构化分块（`core/parser.py` 透传 `page_no`+归一化 `bbox`+`section`）；bbox 契约有回归测试（`test_parser.py::test_normalize_docling_bbox*`） |
 | 复杂布局（多栏/跨页表格） | ⬜ | 真实 Docling 在本轮容器验收中未执行（`NOT_RUN`），复杂布局质量无实测证据；评测集含 Appendix B 跨页题（nist-006 跨物理页 43/44）作为回归样本 |
 | 多语言（检索侧） | ✅ | bge-m3 dense+sparse 声明 100+ 语言；FTS 侧 1–2 字中文 LIKE 兜底（`retrieve_service._short_query`） |
@@ -130,7 +130,7 @@
 
 | 市场基线 | 对标能力 | DocRAG 对应状态 | 差异说明 |
 |----------|----------|----------------|----------|
-| Google NotebookLM `sources` | 回答锚定原文来源、可跳转核对 | ✅ 引用锚定（页码/bbox）+ 原文预览跳转 | NotebookLM 为托管多源聚合；DocRAG 为私有部署单库，引用粒度到页/bbox |
+| Google NotebookLM `sources` | 回答锚定原文来源、可跳转核对 | ✅ 引用锚定（页码/bbox）+ 原文预览跳转 | NotebookLM 为托管多源聚合；DocRAG 为本地部署单库，引用粒度到页/bbox |
 | Azure AI Search RAG | 检索 + 引用 + 权限（向量/关键词混合） | ✅ 混合检索（FAISS+FTS5+RRF）+ 引用 + 文档级 ACL | Azure 是托管搜索服务；DocRAG 本地零外部依赖，规模上限不同（内存 FAISS） |
 | Microsoft Foundry evaluations | 评测/指标体系（含置信区间与分层报告） | 🆕 版本化评测：CI（bootstrap/Wilson）、四维切片、per-query、provenance | 本轮仅无密钥工程基线，真实模型评测 `NOT_RUN` |
 | Google data-source ACL | 数据源级权限控制 | 🆕 租户 + 属主/组/管理员 ACL，fail-closed | 身份注入依赖可信反向代理；无内置认证（见 §3） |

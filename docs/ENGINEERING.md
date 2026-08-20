@@ -1,6 +1,6 @@
 # DocRAG 工程说明
 
-DocRAG 是一套可私有部署、保留 PDF 页码与坐标溯源的文档问答系统。系统覆盖解析、结构化分块、混合检索、重排、流式生成、引用定位、质量评测和容器化部署。
+DocRAG 是一套可本地部署、保留 PDF 页码与坐标溯源的文档问答系统。系统覆盖解析、结构化分块、混合检索、重排、流式生成、引用定位、质量评测和容器化部署。
 
 ## 1. 系统范围
 
@@ -42,7 +42,7 @@ Query → FAISS 稠密召回 + FTS5 关键词召回 → RRF(k=60) 融合 → bge
 | 重排 | bge-reranker-v2-m3 | 本地、多语言、无外部 API 成本 | 首次加载与 CPU 推理耗时较高 |
 | LLM 接入 | openai SDK + `base_url` | Ollama 与 OpenAI 兼容接口共用调用层 | 不同后端的输出稳定性需分别评测 |
 | PDF 预览 | pdf.js + 归一化 bbox | 浏览器端渲染且保留文本层 | bbox 缺失时降级为整页定位 |
-| 身份与 ACL | Principal（租户/用户/组）+ 可信反向代理头注入 | 私有部署无认证体系时仍可隔离租户与权限；浏览器无法伪造 `X-Rag-*`（CORS 白名单不含） | 无内置认证（OIDC 属产品决策）；信任边界=反向代理 |
+| 身份与 ACL | Principal（租户/用户/组）+ 可信反向代理头注入 | 本地部署无认证体系时仍可隔离租户与权限；浏览器无法伪造 `X-Rag-*`（CORS 白名单不含） | 无内置认证（OIDC 属产品决策）；信任边界=反向代理 |
 | 生命周期状态机 | queued→…→indexed + warning/failed/cancelled，原子认领 | cancel/retry 无竞态；document_events 全量审计 | 取消无法强杀进行中的 Docling 原生解析线程 |
 | 版本策略 | source_id + version，索引成功才 promote | 失败的新版本不污染线上（旧版保持 active） | 无回滚操作（归档保留，回滚属产品决策） |
 | 无答案语义 | 缓冲校验 + no_answer(no_evidence/not_supported) | 无支撑内容绝不泄出；LLM 不因无证据被调用 | 低证据阈值展示未做（产品决策） |

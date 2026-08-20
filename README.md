@@ -1,6 +1,6 @@
-# DocRAG — 可私有部署的文档 RAG Web 应用
+# DocRAG — 可本地部署的文档 RAG Web 应用
 
-**本地私有、零外部依赖的 PDF 文档问答系统** —— 从 PDF 上传到带页码引用的回答，一条 `docker compose` 起全套。
+**本地、零外部依赖的 PDF 文档问答系统** —— 从 PDF 上传到带页码引用的回答，一条 `docker compose` 起全套。
 
 ![CI](https://github.com/moonbrigt/docrag/actions/workflows/ci.yml/badge.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688)
@@ -302,7 +302,7 @@ docrag/
 <details>
 <summary><b>为什么用 SQLite + FAISS 而不是向量数据库？</b></summary>
 
-单机私有部署场景下，SQLite 提供元数据/FTS5/向量 BLOB 一体化事务，FAISS 提供内存 ANN 检索，零外部服务依赖。已知边界：单 SQLite 写连接串行化，多 worker 共享向量库属于待产品化项（见 docs/ENGINEERING.md）。
+单机本地部署场景下，SQLite 提供元数据/FTS5/向量 BLOB 一体化事务，FAISS 提供内存 ANN 检索，零外部服务依赖。已知边界：单 SQLite 写连接串行化，多 worker 共享向量库属于待产品化项（见 docs/ENGINEERING.md）。
 </details>
 
 <details>
@@ -320,7 +320,7 @@ docrag/
 <details>
 <summary><b>与 RAGFlow / Dify / privateGPT 有什么不同？</b></summary>
 
-DocRAG 定位是轻量可私有部署的文档问答产品：零外部依赖一条 compose 起全套、引用精确到页码+bbox 高亮、内置可复现公开评测与质量门禁。它不做低代码编排（Dify）或平台级任务流（RAGFlow），代码量小、易读易改，适合作为自托管知识库起点。
+DocRAG 定位是轻量可本地部署的文档问答产品：零外部依赖一条 compose 起全套、引用精确到页码+bbox 高亮、内置可复现公开评测与质量门禁。它不做低代码编排（Dify）或平台级任务流（RAGFlow），代码量小、易读易改，适合作为自托管知识库起点。
 </details>
 
 ## 工程说明
