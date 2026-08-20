@@ -10,12 +10,12 @@ from __future__ import annotations
 
 import hashlib
 import math
+import re
 import threading
 from dataclasses import dataclass, field
 
 from app.config import get_settings
 from app.core import runtime_config
-from app.core.embeddings import effective_embed_config
 
 _settings = get_settings()
 
@@ -78,6 +78,24 @@ def _normalize_docling_bbox(bbox, page_size) -> dict[str, float] | None:
     return {"left": left, "top": top, "right": right, "bottom": bottom}
 
 
+def _split_paragraphs(text: str, max_len: int = 2000) -> list[str]:
+    """按空行分段并折叠换行；超长段按句号/空格回退切分，避免单块过大。"""
+    out: list[str] = []
+    for block in re.split(r"\n\s*\n", text):
+        para = " ".join(line.strip() for line in block.splitlines()).strip()
+        while len(para) > max_len:
+            cut = para.rfind("。", 0, max_len)
+            if cut < max_len // 2:
+                cut = para.rfind(" ", 0, max_len)
+            if cut < 0:
+                cut = max_len
+            out.append(para[: cut + 1].strip())
+            para = para[cut + 1 :].strip()
+        if para:
+            out.append(para)
+    return out
+
+
 class ParseService:
     def __init__(self) -> None:
         self._converter = None
@@ -118,8 +136,32 @@ class ParseService:
         """
         if effective_parse_backend() == "mock":
             return self._mock_parse(file_bytes, filename)
+        if effective_parse_backend() == "pdf":
+            return self._pdf_parse(file_bytes, filename)
         self._ensure()
         return self._docling_parse(source_path or file_bytes)
+
+    # ---------------- 轻量 PDF 路径（pypdf，无 bbox/标题结构） ----------------
+    def _pdf_parse(self, file_bytes: bytes, filename: str) -> ParseResult:
+        from io import BytesIO
+
+        from pypdf import PdfReader
+
+        try:
+            reader = PdfReader(BytesIO(file_bytes))
+        except Exception as exc:
+            raise RuntimeError(f"PDF 解析失败：文件可能加密或损坏（{exc}）") from exc
+        chunks: list[ParsedChunk] = []
+        for i, page in enumerate(reader.pages):
+            try:
+                text = page.extract_text() or ""
+            except Exception:
+                text = ""
+            for para in _split_paragraphs(text):
+                chunks.append(
+                    ParsedChunk(content=para, page_no=i + 1, section=None)
+                )
+        return ParseResult(page_count=len(reader.pages), chunks=chunks)
 
     # ---------------- 真实路径 ----------------
     def _docling_parse(self, source) -> ParseResult:
@@ -132,9 +174,10 @@ class ParseService:
             raise RuntimeError(f"PDF 解析失败：文件可能加密或损坏（{exc}）") from exc
         doc = result.document
         page_count = len(doc.pages) if hasattr(doc, "pages") else 1
-        chunker = HybridChunker(tokenizer=effective_embed_config()["model"], max_tokens=512)
         chunks: list[ParsedChunk] = []
         try:
+            # 切分分词器按 token 数切块，须是真实 HF tokenizer id；Ollama 模型名不能直连 HF
+            chunker = HybridChunker(tokenizer="BAAI/bge-m3", max_tokens=512)
             raw_chunks = list(chunker.chunk(doc))
         except Exception:
             # 个别文档 HybridChunker 异常时退回按页文本切分

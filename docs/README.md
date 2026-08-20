@@ -111,6 +111,7 @@
 | 14 | 2026-08-12 成熟度扩展：trusted-proxy 身份 | 无认证体系 | 身份由可信反向代理注入 X-Rag-* 头（容器 nginx 已注入 default/demo），浏览器无法伪造；生产多租户认证（OIDC）属产品决策，见 MATURITY_MATRIX §3/§11 |
 | 15 | 2026-08-12 成熟度扩展：评测 profile 默认值 | 仅内嵌 22 条 mock 语料 | `/evaluation/run` 默认 `public_nist`（真实公开 PDF + 自建 gold，18 题），未 prepare 返回 409；旧 22 条改 `synthetic_smoke`；真实模型适配器 provenance 一律 NOT_RUN，报告确定性自检 |
 | 16 | 2026-08-12 成熟度扩展：模型 API 运行时配置 | 前端无配置入口，改后端必须改 env + 重建 | 新增 `GET/PUT /config/settings`（runtime_config 表持久化，覆盖优先于 env，即时生效）；设置页 /settings 落地；API key 明文存本地 SQLite、接口只回显 api_key_set；多租户产品化时收敛为管理员角色（见 MATURITY_MATRIX） |
+| 17 | 2026-08-20 解析链路实测 | `parser.py` HybridChunker 将 embed 模型名（Ollama `bge-m3`）当作 HF tokenizer id → 401，真实解析在切块阶段失败 | 改为固定 HF tokenizer `BAAI/bge-m3`，构造纳入 try，异常退回按页切分；Docling 在 WSL 实测通过（NIST AI 100-1/600-1、AI-Agents-in-Depth），结构化分块含 page_no/bbox/section |
 
 ## 6. 文档维护规则（防止再次漂移）
 

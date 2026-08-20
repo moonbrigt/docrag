@@ -10,6 +10,7 @@ data/
 app.db
 app.db-shm
 app.db-wal
+backend/uvicorn.log
 models/
 *.pdf
 !backend/app/tests/**/*.pdf

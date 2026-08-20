@@ -97,6 +97,23 @@ async def get_all_embeddings() -> list[tuple[int, bytes]]:
     return [(r["id"], r["embedding"]) for r in rows]
 
 
+async def get_all_material() -> list[tuple[int, str]]:
+    """返回全部 (chunk_id, content)，用于换模型后按当前嵌入后端重编码。"""
+    rows = db.query("SELECT id, content FROM chunks")
+    return [(r["id"], r["content"]) for r in rows]
+
+
+async def update_embeddings_bulk(items: list[tuple[int, bytes]]) -> None:
+    """批量重写 chunk 的 embedding BLOB（reindex 用）。"""
+
+    def _u(c):
+        c.executemany(
+            "UPDATE chunks SET embedding=? WHERE id=?", [(blob, cid) for cid, blob in items]
+        )
+
+    await db.write(_u)
+
+
 async def count_chunks() -> int:
     row = db.query_one("SELECT COUNT(*) AS n FROM chunks")
     return row["n"] if row else 0

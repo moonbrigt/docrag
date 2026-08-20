@@ -28,16 +28,41 @@ def get_faiss() -> FaissStore:
 def _assert_ready() -> None:
     backend, ready = _embedder.status()
     if not ready:
-        raise ModelNotReadyError(
-            f"嵌入模型未就绪（当前后端：{backend}）。请配置 BAAI/bge-m3 权重，"
-            f"或设置 RAG_EMBED_MOCK=true 以离线验证。"
+        detail = (
+            f"嵌入模型未就绪（当前后端：{backend}）。\n"
+            "- http 后端：在设置页配置 OpenAI 兼容 /v1/embeddings 的 Endpoint 与模型名；\n"
+            "- bge-m3：请配置 BAAI/bge-m3 权重；\n"
+            "- 或设置 RAG_EMBED_MOCK=true 以离线验证。"
         )
+        raise ModelNotReadyError(detail)
 
 
 async def rebuild_faiss() -> None:
     """启动 / 删除后重建内存向量索引。"""
     rows = await chunk_repo.get_all_embeddings()
     _faiss.build_from(rows)
+
+
+async def reindex_all() -> int:
+    """按当前嵌入后端重编码全部 chunk 向量（换模型后调用，保证维度一致）。"""
+    _assert_ready()
+    rows = await chunk_repo.get_all_material()
+    if not rows:
+        await rebuild_faiss()
+        return 0
+    n = 0
+    for i in range(0, len(rows), 64):
+        batch = rows[i : i + 64]
+        ids = [cid for cid, _ in batch]
+        texts = [t for _, t in batch]
+        dense, _ = _embedder.embed(texts)
+        items = [
+            (cid, np.asarray(v, dtype=np.float32).tobytes()) for cid, v in zip(ids, dense)
+        ]
+        await chunk_repo.update_embeddings_bulk(items)
+        n += len(items)
+    await rebuild_faiss()
+    return n
 
 
 async def index_parsed_chunks(document_id: str, parsed_chunks: list) -> int:

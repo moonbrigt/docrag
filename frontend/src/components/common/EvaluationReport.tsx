@@ -89,7 +89,7 @@ export function EvaluationReportView({ report }: { report: EvaluationReport }) {
         <Card>
           <CardHeader>
             <CardTitle>检索消融对比</CardTitle>
-            <span className="text-xs text-meta">同一指标口径，四路检索变体（mock 稠密为确定性嵌入）</span>
+            <span className="text-xs text-meta">同一指标口径，四路检索变体（稠密基于当前嵌入接口）</span>
           </CardHeader>
           <CardBody className="p-0">
             <div className="overflow-auto">

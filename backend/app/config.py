@@ -1,8 +1,8 @@
 """全局配置（pydantic-settings）。
 
 所有可调项通过 RAG_ 前缀的环境变量注入；未设置时使用下方默认值。
-重模型（bge-m3 / reranker / docling）默认走真实后端，但提供 *_MOCK 开关，
-以便离线 / CI 下用确定性 mock 跑通全链路（不下载大模型权重）。
+默认走离线 mock（确定性、不下载权重），开箱即用；真实模型（bge-m3 / reranker /
+docling / LLM）需在设置页或 env 显式开启：RAG_*_MOCK=false 或运行时配置选真实后端。
 """
 from __future__ import annotations
 
@@ -25,26 +25,29 @@ class Settings(BaseSettings):
     MODEL_DIR: str = "./models"
 
     # 嵌入
-    EMBED_BACKEND: str = "bge-m3"  # bge-m3 | mock
-    EMBED_MODEL: str = "BAAI/bge-m3"  # 模型名，可被设置页运行时覆盖
-    EMBED_MOCK: bool = False
+    EMBED_BACKEND: str = "bge-m3"  # bge-m3 | http | mock
+    EMBED_MODEL: str = "BAAI/bge-m3"  # 模型名/http 模型名，可被设置页运行时覆盖
+    # OpenAI 兼容 /v1/embeddings 端点（embeddings/http 后端用；Ollama/LM Studio/Doubao/OpenAI 均可）
+    EMBEDDING_ENDPOINT: str = ""
+    EMBEDDING_API_KEY: str = ""
+    EMBED_MOCK: bool = True
     EMBED_DIM: int = 1024
 
     # 重排
     RERANK_BACKEND: str = "bge-reranker-v2-m3"  # bge-reranker-v2-m3 | mock
     RERANK_MODEL: str = "BAAI/bge-reranker-v2-m3"  # 模型名，可被设置页运行时覆盖
-    RERANK_MOCK: bool = False
+    RERANK_MOCK: bool = True
 
     # 解析
     PARSE_BACKEND: str = "docling"  # docling | mock
-    PARSE_MOCK: bool = False
+    PARSE_MOCK: bool = True
 
     # 计算加速：auto | cuda | cpu（嵌入/重排设备与精度；可被设置页运行时覆盖）
     ACCELERATOR: str = "auto"
 
     # LLM 双后端
     LLM_BACKEND: str = "ollama"  # ollama | openai | mock
-    LLM_MOCK: bool = False
+    LLM_MOCK: bool = True
     OLLAMA_BASE_URL: str = "http://localhost:11434/v1"
     OPENAI_BASE_URL: str = ""
     OPENAI_API_KEY: str = ""

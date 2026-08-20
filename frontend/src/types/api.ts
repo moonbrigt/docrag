@@ -219,9 +219,9 @@ export interface EvaluationRunConfig {
 // ---- 运行时配置（设置页）----
 export type AcceleratorMode = 'auto' | 'cuda' | 'cpu';
 
-export type EmbedBackend = 'bge-m3' | 'mock';
+export type EmbedBackend = 'bge-m3' | 'http' | 'mock';
 export type RerankBackend = 'bge-reranker-v2-m3' | 'mock';
-export type ParseBackend = 'docling' | 'mock';
+export type ParseBackend = 'docling' | 'pdf' | 'mock';
 
 export interface RuntimeLlmConfig {
   backend: 'mock' | 'ollama' | 'openai';
@@ -232,7 +232,11 @@ export interface RuntimeLlmConfig {
 
 export interface RuntimeEmbedConfig {
   backend: EmbedBackend;
-  model: string; // 模型名（HF id 或本地路径）
+  model: string; // 模型名（HF id 或 http 后端模型名）
+  /** OpenAI 兼容 /v1/embeddings 端点（backend=http 时），缺失容错 */
+  endpoint?: string;
+  /** API key 是否已设置（不回传明文），缺失容错 */
+  api_key_set?: boolean;
 }
 
 export interface RuntimeRerankConfig {
@@ -271,6 +275,10 @@ export interface SettingsUpdatePayload {
   embed?: {
     backend?: EmbedBackend | '';
     model?: string;
+    /** OpenAI 兼容 /v1/embeddings 端点（backend=http 时） */
+    endpoint?: string;
+    /** API key；空字符串 = 清除已存密钥 */
+    api_key?: string;
   };
   rerank?: {
     backend?: RerankBackend | '';

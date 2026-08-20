@@ -34,8 +34,11 @@ class LlmSettingsIn(BaseModel):
 
 
 class EmbedSettingsIn(BaseModel):
-    backend: Optional[Literal["bge-m3", "mock", ""]] = None
+    backend: Optional[Literal["bge-m3", "http", "mock", ""]] = None
     model: Optional[str] = None
+    # OpenAI 兼容 /v1/embeddings 端点与 key（仅 http 后端使用）
+    endpoint: Optional[str] = None
+    api_key: Optional[str] = None
 
 
 class RerankSettingsIn(BaseModel):
@@ -44,7 +47,8 @@ class RerankSettingsIn(BaseModel):
 
 
 class ParseSettingsIn(BaseModel):
-    backend: Optional[Literal["docling", "mock", ""]] = None
+    # docling=结构化解析（需真实依赖）；pdf=pypdf 轻量按页抽取；mock=离线合成
+    backend: Optional[Literal["docling", "pdf", "mock", ""]] = None
 
 
 class SettingsIn(BaseModel):
@@ -86,6 +90,10 @@ async def put_settings(req: SettingsIn):
         pairs["embed_backend"] = req.embed.backend
     if req.embed.model is not None:
         pairs["embed_model"] = req.embed.model.strip()
+    if req.embed.endpoint is not None:
+        pairs["embed_endpoint"] = req.embed.endpoint.strip()
+    if req.embed.api_key is not None:
+        pairs["embed_api_key"] = req.embed.api_key.strip()
     if req.rerank.backend is not None:
         pairs["rerank_backend"] = req.rerank.backend
     if req.rerank.model is not None:
@@ -101,14 +109,28 @@ async def put_settings(req: SettingsIn):
         raise HTTPException(status_code=500, detail=f"配置持久化失败：{exc}")
 
     # 计算加速或模型名变更：丢弃已加载的嵌入/重排模型，下次调用按新配置重建
-    if any(k in pairs for k in ("accelerator", "embed_backend", "embed_model")):
+    if any(k in pairs for k in ("accelerator", "embed_backend", "embed_model", "embed_endpoint")):
         index_service.get_embedder().reload()
     if any(k in pairs for k in ("accelerator", "rerank_backend", "rerank_model")):
         rerank_service.get_reranker().reload()
 
-    if "embed_backend" in pairs or "embed_model" in pairs:
+    if any(k in pairs for k in ("embed_backend", "embed_model", "embed_endpoint")):
         # 嵌入模型/后端变更后，已持久化的向量仍停留在旧模型空间。
-        # 只重建内存 FAISS（与 DB 向量自洽），既有文档需重索引才能正确检索。
+        # 只重建内存 FAISS（与 DB 向量自洽），既有文档需重新索引才能正确检索。
         await index_service.rebuild_faiss()
 
     return {"ok": True, **await get_settings()}
+
+
+@router.post("/config/reindex")
+async def reindex_all():
+    """按当前嵌入后端重新编码全部 chunk 向量（换模型后调用，保持维度一致）。"""
+    from app.core.errors import ModelNotReadyError
+
+    try:
+        count = await index_service.reindex_all()
+    except ModelNotReadyError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"重索引失败：{exc}")
+    return {"ok": True, "reindexed": count}
