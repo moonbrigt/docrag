@@ -4,7 +4,7 @@ from app.core import accelerator
 
 def _stub(monkeypatch, override, cuda_avail):
     monkeypatch.setattr(accelerator.runtime_config, "get", lambda k: override)
-    monkeypatch.setattr(accelerator.cuda_available, "__call__", lambda: cuda_avail)
+    monkeypatch.setattr(accelerator, "cuda_available", lambda: cuda_avail)
 
 
 def test_invalid_runtime_value_falls_back_to_auto(monkeypatch):

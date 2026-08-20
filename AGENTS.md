@@ -7,7 +7,7 @@
 
 - 后端：`backend/`（FastAPI，入口 `app/main.py`，API 前缀 `/api/v1`）
 - 前端：`frontend/`（React 19 + Vite 8 + TS 5.6 + Tailwind 4 + Radix + Lucide + pdfjs）
-- 测试：后端 `python -m pytest -q`（61 个测试项，含 ACL/生命周期/版本/chat 与公开评测测试）；前端无测试
+- 测试：后端 `python -m pytest -q`（76 个测试项，含 ACL/生命周期/版本/chat 与公开评测测试）；前端无测试
 - 部署：`docker compose up --build` → http://localhost:3002（默认 MOCK 离线；3000 常被本机其他服务占用）
 - 评测：`cd backend && python -m app.evaluation.public_runner run`（NIST 公开评测，先 `scripts/evaluation/prepare.sh`；旧 22 条手写集为 `synthetic_smoke`，走 `python -m app.evaluation.runner`）
 - 关键契约：`docs/SPEC.md`（12 章，Spec as Contract）

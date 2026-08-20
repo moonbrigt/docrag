@@ -16,7 +16,7 @@
 | 设计 | `frontend/src/design/`（DESIGN.md / design-tokens.json / component-states.md / wireframes.md）+ `frontend/src/styles/tokens.css` | 设计系统权威版（顶层 `web/` 为早期稿，已 Superseded） | 设计变更时；**token 以 design-tokens.json 为源** |
 | 实现 | 本文档 `docs/README.md` + 源码 | 速查表、裁决记录、维护规则 | **每次改代码必同步** |
 | 部署 | `docs/DEPLOYMENT.md` | Docker 一键部署、真实模型切换、env 一览、故障排查 | 部署/配置变更时 |
-| 测试 | `backend/app/tests/`（smoke + 成熟度 + 评测，61 项） | 接口冒烟、ACL/生命周期/版本/chat 契约与检索质量断言 | 每次改代码必跑 `pytest -q` |
+| 测试 | `backend/app/tests/`（smoke + 成熟度 + 评测，76 项） | 接口冒烟、ACL/生命周期/版本/chat 契约与检索质量断言 | 每次改代码必跑 `pytest -q` |
 | 工程说明 | `docs/ENGINEERING.md` | 关键决策、技术权衡、验证状态与已知边界 | 架构或验证状态变化时 |
 | 成熟度审计 | `docs/MATURITY_MATRIX.md` | 10 维度成熟度矩阵（✅/🆕/⬜/❓）+ 市场基线对照 | 功能/权限/状态机变化时 |
 | 数据卡 | `docs/DATA_CARD.md` | 评测数据集来源、许可、页码映射、gold 结构与声明 | 数据集变更时 |
