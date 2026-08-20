@@ -14,37 +14,48 @@ import threading
 import numpy as np
 
 from app.config import get_settings
+from app.core import runtime_config
 
 _settings = get_settings()
 _TOKEN_RE = re.compile(r"[\w\u4e00-\u9fff]+", re.UNICODE)
+
+
+def effective_embed_config() -> dict:
+    """当前生效的嵌入配置（设置页展示用）：运行时覆盖 > env 默认。"""
+    backend = runtime_config.effective("embed_backend", _settings.EMBED_BACKEND)
+    if _settings.EMBED_MOCK and runtime_config.get("embed_backend") is None:
+        backend = "mock"  # env 显式 RAG_EMBED_MOCK=true 时默认 mock
+    return {"backend": backend, "model": runtime_config.effective("embed_model", _settings.EMBED_MODEL)}
 
 
 def _tokenize(text: str) -> list[str]:
     return _TOKEN_RE.findall(text.lower())
 
 
+def _is_mock() -> bool:
+    return effective_embed_config()["backend"] == "mock"
+
+
 class EmbeddingService:
     def __init__(self) -> None:
         self._model = None
         self._lock = threading.Lock()
-        self._mock = _settings.EMBED_MOCK
-        self._backend_name = "mock" if self._mock else _settings.EMBED_BACKEND
         self._load_error: str | None = None
 
     # ---- 就绪状态 ----
     def status(self) -> tuple[str, bool]:
         """返回 (后端名, 是否可用)。"""
-        if self._mock:
+        if _is_mock():
             return ("mock", True)
         if self._ensure() is not None:
-            return (self._backend_name, True)
-        return (self._backend_name, False)
+            return (effective_embed_config()["backend"], True)
+        return (effective_embed_config()["backend"], False)
 
     def is_ready(self) -> bool:
         return self.status()[1]
 
     def reload(self) -> None:
-        """丢弃已加载模型，下次调用按最新计算加速档位重建（GPU 开关热生效）。"""
+        """丢弃已加载模型，下次调用按最新配置（模型名 / 计算加速档位）重建。"""
         self._model = None
         self._load_error = None
 
@@ -52,7 +63,7 @@ class EmbeddingService:
     def _ensure(self):
         if self._model is not None:
             return self._model
-        if self._mock:
+        if _is_mock():
             return None
         with self._lock:
             if self._model is None:
@@ -61,8 +72,9 @@ class EmbeddingService:
 
                     from app.core import accelerator
 
-                    model_id = "BAAI/bge-m3"
-                    local = f"{_settings.MODEL_DIR.rstrip('/')}/bge-m3"
+                    model = effective_embed_config()["model"]
+                    slug = model.rsplit("/", 1)[-1]
+                    local = f"{_settings.MODEL_DIR.rstrip('/')}/{slug}"
                     device = accelerator.device()
                     fp16 = accelerator.use_fp16()
                     try:
@@ -72,7 +84,7 @@ class EmbeddingService:
                     except Exception:
                         # 本地不存在则回退到 HF 自动拉取
                         self._model = BGEM3FlagModel(
-                            model_id, use_fp16=fp16, devices=device
+                            model, use_fp16=fp16, devices=device
                         )
                 except Exception as exc:
                     # 真实后端加载失败（权重缺失/未安装）：仅当显式开启 mock 才降级；
@@ -84,7 +96,7 @@ class EmbeddingService:
     # ---- 编码 ----
     def embed(self, texts: list[str]) -> tuple[list[np.ndarray], list[dict]]:
         """返回 (dense 列表[np.float32], sparse 列表[dict])。"""
-        if self._mock or self._ensure() is None:
+        if _is_mock() or self._ensure() is None:
             dense = [self._mock_embed(t) for t in texts]
             sparse: list[dict] = [{} for _ in texts]
             return dense, sparse

@@ -65,6 +65,8 @@ volumes:
 
 重新构建并启动：`docker compose up --build`。
 
+> **也可运行时切换（无需改 env / 重建）**：`/config/settings`（设置页）支持对 LLM、嵌入（`embed`）、重排（`rerank`）、解析（`parse`）的 `backend` 与 `model` 做运行时覆盖，持久化到本地 SQLite，即时生效。生效优先级：运行时覆盖 > 环境变量默认。切换嵌入模型后，已持久化向量仍停留在旧模型空间，既有文档需重新上传以正确检索；新上传文档即时用新模型。
+
 ### LLM 双后端说明
 - **Ollama（默认）**：宿主机运行 Ollama 并 `ollama pull llama3.1:8b`，`RAG_OLLAMA_BASE_URL` 指向其 `/v1` 端点（容器内访问宿主用 `host.docker.internal`）。
 - **OpenAI 兼容**：设 `RAG_LLM_BACKEND=openai`，填 `RAG_OPENAI_BASE_URL` 与 `RAG_OPENAI_API_KEY`，模型名 `RAG_LLM_MODEL`。无需改动代码（统一 openai SDK + base_url）。

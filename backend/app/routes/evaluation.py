@@ -9,9 +9,10 @@ from __future__ import annotations
 import json
 
 from fastapi import APIRouter, HTTPException
+from starlette.concurrency import run_in_threadpool
 
 from app import db
-from app.evaluation import public_runner, runner
+from app.evaluation import public_real, public_runner, runner
 from app.schemas import EvaluationReport, EvaluationRunRequest
 
 router = APIRouter(prefix="/api/v1", tags=["evaluation"])
@@ -37,11 +38,19 @@ async def run_evaluation(req: EvaluationRunRequest):
                 ),
             )
         try:
-            report = public_runner.build_report(work_dir)
-        except ValueError as exc:  # 缓存语料与 manifest 版本不符等
+            # 真实完整管线：bge-m3 嵌入 + bge-reranker-v2-m3 重排 + Ollama 生成式答案
+            report = await run_in_threadpool(public_real.build_report, work_dir)
+        except AssertionError as exc:  # mock 后端未关闭 / 真实模型未加载
             raise HTTPException(
-                status_code=409,
-                detail=f"public_nist 语料不可用（{exc}），请重新运行 scripts/evaluation/prepare.sh",
+                status_code=503,
+                detail=(
+                    "public_nist 评测要求真实完整管线，请先在设置页关闭 mock、启用 "
+                    "bge-m3 / bge-reranker-v2-m3 / Ollama，再重试"
+                ),
+            ) from exc
+        except Exception as exc:
+            raise HTTPException(
+                status_code=503, detail=f"public_nist 真实管线评测失败：{exc}"
             ) from exc
     else:
         raise HTTPException(

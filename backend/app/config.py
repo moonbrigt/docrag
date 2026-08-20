@@ -26,11 +26,13 @@ class Settings(BaseSettings):
 
     # 嵌入
     EMBED_BACKEND: str = "bge-m3"  # bge-m3 | mock
+    EMBED_MODEL: str = "BAAI/bge-m3"  # 模型名，可被设置页运行时覆盖
     EMBED_MOCK: bool = False
     EMBED_DIM: int = 1024
 
     # 重排
     RERANK_BACKEND: str = "bge-reranker-v2-m3"  # bge-reranker-v2-m3 | mock
+    RERANK_MODEL: str = "BAAI/bge-reranker-v2-m3"  # 模型名，可被设置页运行时覆盖
     RERANK_MOCK: bool = False
 
     # 解析

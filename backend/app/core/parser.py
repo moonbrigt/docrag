@@ -14,8 +14,17 @@ import threading
 from dataclasses import dataclass, field
 
 from app.config import get_settings
+from app.core import runtime_config
+from app.core.embeddings import effective_embed_config
 
 _settings = get_settings()
+
+
+def effective_parse_backend() -> str:
+    """当前生效的解析后端：运行时覆盖 > env 默认。"""
+    if _settings.PARSE_MOCK and runtime_config.get("parse_backend") is None:
+        return "mock"  # env 显式 RAG_PARSE_MOCK=true 时默认 mock
+    return runtime_config.effective("parse_backend", _settings.PARSE_BACKEND)
 
 
 @dataclass
@@ -73,25 +82,27 @@ class ParseService:
     def __init__(self) -> None:
         self._converter = None
         self._lock = threading.Lock()
-        self._mock = _settings.PARSE_MOCK
-        self._backend_name = "mock" if self._mock else _settings.PARSE_BACKEND
 
     def status(self) -> tuple[str, bool]:
-        if self._mock:
+        if effective_parse_backend() == "mock":
             return ("mock", True)
         try:
             self._ensure()
-            return (self._backend_name, True)
+            return (effective_parse_backend(), True)
         except Exception:
-            return (self._backend_name, False)
+            return (effective_parse_backend(), False)
 
     def is_ready(self) -> bool:
         return self.status()[1]
 
+    def reload(self) -> None:
+        """丢弃已加载的 Docling 转换器，下次调用按最新后端重建。"""
+        self._converter = None
+
     def _ensure(self):
         if self._converter is not None:
             return self._converter
-        if self._mock:
+        if effective_parse_backend() == "mock":
             return None
         with self._lock:
             if self._converter is None:
@@ -105,7 +116,7 @@ class ParseService:
 
         file_bytes 与 source_path 二选一；source_path 优先（Docling 直接吃路径）。
         """
-        if self._mock:
+        if effective_parse_backend() == "mock":
             return self._mock_parse(file_bytes, filename)
         self._ensure()
         return self._docling_parse(source_path or file_bytes)
@@ -121,7 +132,7 @@ class ParseService:
             raise RuntimeError(f"PDF 解析失败：文件可能加密或损坏（{exc}）") from exc
         doc = result.document
         page_count = len(doc.pages) if hasattr(doc, "pages") else 1
-        chunker = HybridChunker(tokenizer="BAAI/bge-m3", max_tokens=512)
+        chunker = HybridChunker(tokenizer=effective_embed_config()["model"], max_tokens=512)
         chunks: list[ParsedChunk] = []
         try:
             raw_chunks = list(chunker.chunk(doc))

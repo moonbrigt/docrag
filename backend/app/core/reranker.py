@@ -11,38 +11,49 @@ import threading
 import numpy as np
 
 from app.config import get_settings
+from app.core import runtime_config
 from app.core.embeddings import _tokenize
 
 _settings = get_settings()
+
+
+def effective_rerank_config() -> dict:
+    """当前生效的重排配置：运行时覆盖 > env 默认。"""
+    backend = runtime_config.effective("rerank_backend", _settings.RERANK_BACKEND)
+    if _settings.RERANK_MOCK and runtime_config.get("rerank_backend") is None:
+        backend = "mock"
+    return {"backend": backend, "model": runtime_config.effective("rerank_model", _settings.RERANK_MODEL)}
+
+
+def _is_mock() -> bool:
+    return effective_rerank_config()["backend"] == "mock"
 
 
 class RerankService:
     def __init__(self) -> None:
         self._model = None
         self._lock = threading.Lock()
-        self._mock = _settings.RERANK_MOCK
-        self._backend_name = "mock" if self._mock else _settings.RERANK_BACKEND
         self._load_error: str | None = None
 
     def status(self) -> tuple[str, bool]:
-        if self._mock:
+        if _is_mock():
             return ("mock", True)
         if self._ensure() is not None:
-            return (self._backend_name, True)
-        return (self._backend_name, False)
+            return (effective_rerank_config()["backend"], True)
+        return (effective_rerank_config()["backend"], False)
 
     def is_ready(self) -> bool:
         return self.status()[1]
 
     def reload(self) -> None:
-        """丢弃已加载模型，下次调用按最新计算加速档位重建（GPU 开关热生效）。"""
+        """丢弃已加载模型，下次调用按最新配置（模型名 / 计算加速档位）重建。"""
         self._model = None
         self._load_error = None
 
     def _ensure(self):
         if self._model is not None:
             return self._model
-        if self._mock:
+        if _is_mock():
             return None
         with self._lock:
             if self._model is None:
@@ -51,13 +62,14 @@ class RerankService:
 
                     from app.core import accelerator
 
-                    model_id = "BAAI/bge-reranker-v2-m3"
-                    local = f"{_settings.MODEL_DIR.rstrip('/')}/bge-reranker-v2-m3"
+                    model = effective_rerank_config()["model"]
+                    slug = model.rsplit("/", 1)[-1]
+                    local = f"{_settings.MODEL_DIR.rstrip('/')}/{slug}"
                     device = accelerator.device()
                     try:
                         self._model = CrossEncoder(local, device=device)
                     except Exception:
-                        self._model = CrossEncoder(model_id, device=device)
+                        self._model = CrossEncoder(model, device=device)
                 except Exception as exc:
                     # 真实后端加载失败：仅显式 mock 才降级；否则保持未就绪 -> 503
                     self._load_error = str(exc)
@@ -66,7 +78,7 @@ class RerankService:
 
     def score(self, query: str, passages: list[str]) -> list[float]:
         """返回与 passages 等长的相关分（升序无要求，数值越大越相关）。"""
-        if self._mock or self._ensure() is None:
+        if _is_mock() or self._ensure() is None:
             q_tokens = set(_tokenize(query))
             scores: list[float] = []
             for p in passages:

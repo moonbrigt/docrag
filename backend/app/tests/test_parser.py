@@ -5,15 +5,18 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.core import parser as parser_mod
 from app.core.parser import ParseResult, ParseService, _normalize_docling_bbox
 
 
 def test_parse_lazily_initializes_real_docling_path(monkeypatch):
     service = ParseService()
-    service._mock = False
     service._converter = None
     expected = ParseResult(page_count=1)
     calls: list[object] = []
+
+    # 强制真实 Docling 后端（容器默认 env 为 mock）
+    monkeypatch.setattr(parser_mod, "effective_parse_backend", lambda: "docling")
 
     def fake_ensure():
         calls.append("ensure")

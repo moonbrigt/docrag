@@ -31,6 +31,11 @@ def get(key: str) -> str | None:
     return _overrides.get(key)
 
 
+def effective(key: str, default: str) -> str:
+    """运行时覆盖优先，其次 env 默认（各核心服务读取生效值的统一入口）。"""
+    return get(key) or default
+
+
 async def set_overrides(pairs: dict[str, str]) -> None:
     """写入覆盖并持久化。值传空字符串表示清除该键的覆盖。"""
 

@@ -219,6 +219,10 @@ export interface EvaluationRunConfig {
 // ---- 运行时配置（设置页）----
 export type AcceleratorMode = 'auto' | 'cuda' | 'cpu';
 
+export type EmbedBackend = 'bge-m3' | 'mock';
+export type RerankBackend = 'bge-reranker-v2-m3' | 'mock';
+export type ParseBackend = 'docling' | 'mock';
+
 export interface RuntimeLlmConfig {
   backend: 'mock' | 'ollama' | 'openai';
   base_url: string;
@@ -226,8 +230,25 @@ export interface RuntimeLlmConfig {
   api_key_set: boolean;
 }
 
+export interface RuntimeEmbedConfig {
+  backend: EmbedBackend;
+  model: string; // 模型名（HF id 或本地路径）
+}
+
+export interface RuntimeRerankConfig {
+  backend: RerankBackend;
+  model: string;
+}
+
+export interface RuntimeParseConfig {
+  backend: ParseBackend;
+}
+
 export interface RuntimeConfigResponse {
   llm: RuntimeLlmConfig;
+  embed: RuntimeEmbedConfig;
+  rerank: RuntimeRerankConfig;
+  parse: RuntimeParseConfig;
   apply_mode: 'runtime_override';
   /** 计算加速档位（auto/cuda/cpu），缺失容错 */
   accelerator?: AcceleratorMode;
@@ -245,5 +266,17 @@ export interface SettingsUpdatePayload {
     model?: string;
     /** 空字符串 = 清除覆盖，回落 env 的 RAG_ACCELERATOR */
     accelerator?: AcceleratorMode | '';
+  };
+  /** 仅传要改的字段；空字符串清除覆盖回落 env */
+  embed?: {
+    backend?: EmbedBackend | '';
+    model?: string;
+  };
+  rerank?: {
+    backend?: RerankBackend | '';
+    model?: string;
+  };
+  parse?: {
+    backend?: ParseBackend | '';
   };
 }
