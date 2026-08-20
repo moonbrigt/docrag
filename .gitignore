@@ -8,6 +8,8 @@ __pycache__/
 # 运行时数据（首次运行自动生成）
 data/
 app.db
+app.db-shm
+app.db-wal
 models/
 *.pdf
 !backend/app/tests/**/*.pdf
