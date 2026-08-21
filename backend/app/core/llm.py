@@ -111,8 +111,17 @@ class LLMClient:
                 if not chunk.choices:
                     continue
                 delta = chunk.choices[0].delta
-                if delta and delta.content:
-                    yield delta.content
+                if not delta:
+                    continue
+                # reasoning 模型（GLM-5.2 / deepseek-v4 / sensenova）
+                # 输出在 reasoning_content 或 reasoning 字段，content 可能为空
+                text = (
+                    delta.content
+                    or getattr(delta, "reasoning_content", None)
+                    or getattr(delta, "reasoning", None)
+                )
+                if text:
+                    yield text
         except Exception as exc:  # 连通性 / 鉴权失败，向上抛出由路由转 503
             raise RuntimeError(f"LLM 调用失败：{exc}") from exc
 
