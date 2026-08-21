@@ -94,7 +94,7 @@ class TestCacheOperations:
 
     def test_lru_eviction(self):
         from app.services import retrieve_service
-        from app.services.retrieve_service import _cache_get, _cache_set
+        from app.services.retrieve_service import _cache_set
         # 填充超过 500 条触发淘汰
         for i in range(502):
             _cache_set(f"key_{i}", _make_result(f"doc_{i}"))
