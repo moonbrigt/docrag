@@ -98,7 +98,7 @@ async def _judge_one(
             asyncio.ensure_future(
                 _consume_stream(llm_client.stream(_JUDGE_SYSTEM, user_msg))
             ),
-            timeout=30,
+            timeout=60,
         )
         scores = _parse_judge_response(raw)
         # 校验分数范围
