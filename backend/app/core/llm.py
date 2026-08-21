@@ -107,9 +107,12 @@ class LLMClient:
                 temperature=0.0,
             )
             async for chunk in stream:
-                delta = chunk.choices[0].delta.content
-                if delta:
-                    yield delta
+                # 部分 OpenAI 兼容 API 返回空 choices（如 heartbeat / reasoning 模型）
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta
+                if delta and delta.content:
+                    yield delta.content
         except Exception as exc:  # 连通性 / 鉴权失败，向上抛出由路由转 503
             raise RuntimeError(f"LLM 调用失败：{exc}") from exc
 
