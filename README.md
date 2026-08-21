@@ -8,24 +8,18 @@ PDF 上传 → Docling 结构化解析 → 混合检索 → 引用门控生成 �
 
 ![CI](https://github.com/moonbrigt/docrag/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/License-MIT-blue)
-![Python](https://img.shields.io/badge/Python-3.12-3776AB)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688)
-![React](https://img.shields.io/badge/React-19-61DAFB)
 
 </div>
 
 ---
 
-## ✨ 核心特性
+## ✨ 特性
 
-| 特性 | 说明 |
-|------|------|
-| 🔍 **混合检索** | FAISS 稠密向量 + SQLite FTS5 关键词双路召回，RRF(k=60) 融合，bge-reranker 精排 |
-| 📄 **像素级溯源** | Docling HybridChunker 保留 page_no + bbox 坐标，点击引用跳页高亮 |
-| 🧪 **评测工程化** | NIST 公开 PDF 18 题 gold 标注，bootstrap/Wilson 95% CI，四路消融对比 |
-| 🔐 **多租户 ACL** | Principal(tenant/user/groups) + fail-closed 可见性，可信反向代理注入 |
-| 📊 **可观测性** | 结构化 JSON 日志 + /metrics 计数器与延迟直方图(p50/p95/max) |
-| ⚡ **离线可跑** | 默认 MOCK 模式零外部依赖，一条命令起全套；真实模型设置页运行时切换 |
+- **混合检索** — FAISS 稠密向量 + FTS5 关键词双路召回 + RRF 融合 + 可插拔重排
+- **像素级溯源** — 引用携带页码 + bbox 坐标，点击跳页高亮
+- **评测工程化** — NIST 公开 PDF 评测集，LLM-as-Judge 质量评分，CI 门禁
+- **多租户 ACL** — 租户/用户/组级别可见性控制
+- **离线可跑** — 默认 MOCK 模式零依赖，真实模型设置页切换
 
 ## 🏗️ 架构
 
@@ -74,16 +68,7 @@ bash ../scripts/evaluation/run.sh       # 运行评测，报告写入 work/
 | mock 基线 | 0.625 | 0.844 | 0.747 | 0.754 | 0.844 | 0.063 |
 | 真实模型 | 0.813 | 0.938 | 0.906 | 0.907 | 0.813 | 0.214 |
 
-**检索消融对比（四路变体）**
-
-| 变体 | recall@5 | MRR | nDCG@5 |
-|------|---------|-----|--------|
-| BM25 + 词法重排 | **0.844** | **0.747** | **0.754** |
-| mock 稠密 | 0.594 | 0.440 | 0.469 |
-| RRF 混合 | 0.750 | 0.641 | 0.663 |
-| 混合 + 词法重排 | 0.750 | 0.703 | 0.709 |
-
-> 详细指标、CI、切片分析见 [docs/BENCHMARK_CARD.md](docs/BENCHMARK_CARD.md)
+> 消融对比、CI 门禁、切片分析见 [docs/BENCHMARK_CARD.md](docs/BENCHMARK_CARD.md)
 
 ## 🖼️ 界面预览
 
@@ -108,62 +93,25 @@ bash ../scripts/evaluation/run.sh       # 运行评测，报告写入 work/
 
 ```
 docrag/
-├── backend/
-│   ├── app/
-│   │   ├── core/            # parser / embeddings / reranker / llm / faiss_store / metrics
-│   │   ├── services/        # pipeline / retrieve / rerank / generate / citation
-│   │   ├── repositories/    # document / chunk / trace (SQLite + FTS5)
-│   │   ├── routes/          # 22 个 RESTful 端点 (/api/v1)
-│   │   ├── evaluation/      # 评测 runner + 指标 + 消融
-│   │   └── tests/           # 107 项自动化测试
-│   └── start_mock.sh        # 一键离线启动
-├── frontend/
-│   └── src/
-│       ├── pages/           # Home / Documents / Chat / Evaluation / Settings
-│       ├── components/      # CitationChip / PDFPreview / ScopePanel
-│       └── design/          # Design Token 系统（双主题）
-├── docs/                    # SPEC / architecture / BENCHMARK_CARD / ...
-└── scripts/evaluation/      # 评测门禁脚本
+├── backend/        # FastAPI 后端（core / services / repositories / routes / evaluation / tests）
+├── frontend/       # React SPA（pages / components / design）
+├── docs/           # 规格文档、架构、评测卡片
+└── scripts/        # 评测门禁脚本
 ```
 
 ## ⚙️ 配置
 
-所有配置通过 `RAG_` 前缀环境变量注入，支持设置页运行时覆盖：
-
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `RAG_LLM_MOCK` | true | LLM 走 mock（离线） |
-| `RAG_EMBED_MOCK` | true | 嵌入走 mock |
-| `RAG_RERANK_MOCK` | true | 重排走 mock |
-| `RAG_PARSE_MOCK` | true | 解析走 mock |
-| `RAG_CACHE_TTL` | 300 | 查询缓存 TTL（秒），0=禁用 |
-| `RAG_TRUSTED_PROXY` | false | 信任反向代理注入的身份头 |
-
-完整配置见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+环境变量 + 设置页运行时覆盖，详见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
 
 ## 📖 API
 
-22 个端点，统一前缀 `/api/v1`：
-
-| 端点 | 说明 |
-|------|------|
-| `POST /documents` | 上传 PDF，触发异步索引 |
-| `POST /chat` | SSE 流式问答（stage/delta/citation/no_answer/done） |
-| `POST /search` | 检索调试 |
-| `GET /metrics` | 可观测指标（计数器 + 延迟直方图） |
-| `POST /evaluation/run` | 运行评测集 |
-| `GET/PUT /config/settings` | 运行时模型配置 |
-
-完整 API 文档见 [docs/SPEC.md](docs/SPEC.md)
+统一前缀 `/api/v1`，22 个端点。核心：`POST /documents`（上传）、`POST /chat`（SSE 问答）、`GET /metrics`（可观测）。完整文档见 [docs/SPEC.md](docs/SPEC.md)
 
 ## 🧪 测试
 
 ```bash
-cd backend
-./.venv/bin/python -m pytest -q   # 107 项全绿
+cd backend && python -m pytest -q   # 107 项
 ```
-
-覆盖：冒烟测试 + 成熟度（ACL/生命周期/SSE 契约/缓存/citation）+ 评测
 
 ## 🤝 贡献
 
