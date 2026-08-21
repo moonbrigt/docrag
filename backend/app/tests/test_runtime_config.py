@@ -4,10 +4,11 @@ from fastapi.testclient import TestClient
 
 
 @pytest.fixture(autouse=True)
-def _reset_runtime_config():
-    """每个用例清空运行时覆盖，避免用例间污染。"""
+def _reset_runtime_config(monkeypatch):
+    """每个用例清空运行时覆盖，避免用例间污染；同时清除 OPENAI_API_KEY 防止 .env 残留。"""
     from app.core import runtime_config
 
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     runtime_config._overrides.clear()
     yield
     runtime_config._overrides.clear()
