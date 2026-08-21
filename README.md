@@ -1,5 +1,3 @@
-<!-- lang: zh-CN -->
-
 # DocRAG
 
 <div align="center">
@@ -108,11 +106,14 @@ bash ../scripts/evaluation/run.sh       # 运行评测，报告写入 work/
 
 ## 🛠️ 技术栈
 
-**前端**：React + TypeScript + Vite + Tailwind CSS + pdfjs-dist
-
-**后端**：FastAPI + SQLite（FTS5）+ FAISS + Docling + bge-m3 + bge-reranker + OpenAI SDK
-
-**评测**：NIST 公开 PDF 评测集 + LLM-as-Judge + bootstrap/Wilson CI
+| 层 | 选型 |
+|----|------|
+| 前端 | React + TypeScript + Vite + Tailwind CSS + Radix UI + Zustand + pdfjs-dist + Lucide |
+| 后端 | FastAPI + Pydantic + SQLite（FTS5）+ FAISS + OpenAI SDK |
+| 解析 | Docling HybridChunker（page_no + bbox 溯源） |
+| 向量 | bge-m3（dense + sparse）|
+| 重排 | bge-reranker-v2-m3（CrossEncoder） |
+| 评测 | NIST 公开 PDF + LLM-as-Judge + bootstrap/Wilson CI |
 
 ## 📁 项目结构
 
