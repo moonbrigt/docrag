@@ -39,7 +39,7 @@ def default_principal() -> Principal:
 def get_principal(request: Request) -> Principal:
     """FastAPI 依赖：解析当前请求的身份。
 
-    RAG_TRUSTED_PROXY=true 时信任反向代理注入的头（nginx 必须配置
+    RAG_TRUSTED_PROXY=true 时信任反向代理注入的头（反向代理需配置
     proxy_set_header X-Rag-Tenant / X-Rag-User / X-Rag-Group，且禁止
     浏览器直连后端）；否则忽略一切身份头，返回本地默认身份。
     """

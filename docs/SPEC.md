@@ -9,7 +9,7 @@
 
 ## 1. 产品定义
 
-- **一句话描述**：一套可本地部署的文档 RAG 应用，用 Docling 保留页码溯源，以「向量 + 关键词」混合检索 + 重排，生成带精准页码引用、可跳转原文 PDF 的回答；默认本地 Ollama、可切 OpenAI 兼容 API。
+- **一句话描述**：一套可本地部署的文档 RAG 应用，用 Docling 保留页码溯源，以「向量 + 关键词」混合检索 + 重排，生成带精准页码引用、可跳转原文 PDF 的回答；默认离线 mock（开箱即用、不下载权重），真实模型（Ollama / OpenAI 兼容）经设置页运行时配置。
 - **目标用户**：企业知识库管理员 / 合规审查员（P1）、研究者与学生（P2）、开发者与集成方（P3）。
 - **核心问题**：让「就 PDF 提问并得到可核实出处」做到精准页码溯源、零依赖部署、中英混合默认可用。
 
@@ -24,7 +24,7 @@
 | P0 | F5 带页码引用回答（双后端 Ollama/OpenAI，env 切换） | 回答含 [页码] 标记，后端可切换 | 7.5 |
 | P0 | F6 PDF 原文预览 + 引用高亮跳转 | 点击引用跳页并高亮 bbox 区域 | 6.08 |
 | P0 | F7 多语言默认嵌入（bge-m3 dense+sparse） | 中英混排开箱可用，无需手动换模型 | 8.0 |
-| P1 | F8 Docker 零外部依赖部署 | 一条 compose 起全套，无外部服务依赖 | 4.8 |
+| P1 | F8 WSL 零外部依赖本地部署 | 一条命令在 WSL 起全套（后端 + 前端），无外部服务依赖 | 4.8 |
 | P1 | F9 基础评测集 + 评测脚本 | ≥20 条问答 + 标准出处，输出引用准确率/召回率 | 3.2 |
 | P1 | F10 多文档管理（上传列表/删除/状态） | 增删文档同步索引与 FTS/向量清理 | 2.1 |
 
@@ -58,15 +58,15 @@
 | 关键词 | SQLite FTS5 | trigram tokenizer | 中英子串匹配，零依赖 |
 | 元数据/FTS | SQLite | 3.34+ 内置 FTS5 | 单文件、零服务 |
 | LLM | openai SDK（双后端抽象） | openai>=1.40 | base_url 切换 Ollama/OpenAI，零分支 |
-| 部署 | Docker + docker-compose | - | 单 compose 起前后端全链路 |
+| 部署 | WSL（Ubuntu）原生：uvicorn + Vite | - | 后端 venv + uvicorn，前端 Vite dev/build |
 | 运行环境 | Python | >=3.10，推荐 3.11 | Docling 2.x 弃用 3.9 |
 
-**双后端抽象（LLM）env 契约**：
-- `RAG_LLM_BACKEND=ollama|openai`（默认 ollama）
+**LLM / 嵌入 / 重排后端为运行时配置（settings 页选择，持久至 `runtime_config` 表，覆盖 env 默认）**；env 默认 `RAG_*_MOCK=true`（离线开箱即用）。env 契约示例：
+- `RAG_LLM_BACKEND=mock|ollama|openai`（默认 mock）
 - `RAG_OLLAMA_BASE_URL=http://localhost:11434/v1`
 - `RAG_OPENAI_BASE_URL=`、`RAG_OPENAI_API_KEY=`、`RAG_LLM_MODEL=`
 
-**模型获取策略（部署约束）**：模型权重（bge-m3 ~2.2GB/int8 量化570MB、reranker 568MB）运行时挂载 volume + 首次自动拉取（HuggingFace / Ollama），镜像保持精简；部署文档明示最低配置 ≥8GB RAM、≥10GB 空闲磁盘。
+**模型获取策略（部署约束）**：模型权重（bge-m3 ~2.2GB/int8 量化570MB、reranker 568MB）首次使用自动拉取（HuggingFace / Ollama）并缓存本地；部署文档明示最低配置 ≥8GB RAM、≥10GB 空闲磁盘。
 
 ## 5. API 端点清单（锁定——开发时以此为唯一依据）
 
@@ -82,6 +82,9 @@
 | POST | /chat | 问答（SSE 流式，带引用） | 否 | {query, document_ids?, rerank?:bool} | text/event-stream（delta + citation 事件） |
 | POST | /search | 检索调试（非流式，返回候选+分数） | 否 | {query, top_k?(默认5), rerank?(默认true), document_ids?} | {query, rerank, count, results[]} |
 | GET | /config/backends | 双后端状态（LLM/Rerank/Embedding 是否就绪） | 否 | - | BackendStatus |
+| GET | /config/settings | 读运行时模型配置（runtime_config 表；API key 仅回传 api_key_set 布尔） | 否 | - | ModelSettings |
+| PUT | /config/settings | 写运行时模型配置（覆盖 env 默认，即时重载，无需重启） | 否 | ModelSettings | ModelSettings |
+| POST | /config/reindex | 全量重新索引所有文档（切换嵌入后端/维度变化后需重编码） | 否 | - | 后台任务进度 |
 | GET | /health | 健康检查 | 否 | - | {status, db, models} |
 | GET | /metrics | 可观测指标（计数器 + 延迟直方图，JSON） | 否 | - | {counters, histograms, generated_at} |
 | POST | /evaluation/run | 运行评测集 | 否 | {config?} | EvaluationReport（默认 profile `public_nist`；未 prepare 409） |
@@ -158,7 +161,7 @@
 | AC-06 | PDF 高亮 | When 用户点击引用，系统**必须**打开对应 PDF 页并在 bbox（若有）区域叠加琥珀高亮 | P0 |
 | AC-07 | 双后端 | If `RAG_LLM_BACKEND=openai` 且配置 endpoint，系统**必须**走 OpenAI 兼容 API 生成带引用回答 | P0 |
 | AC-08 | 多语言 | When 知识库含中英混排文档，系统**必须**用 bge-m3 召回对应段落并给出页码 | P0 |
-| AC-09 | Docker | When 执行 `docker compose up`，系统**必须**自包含启动前后端全链路且无外部服务依赖 | P1 |
+| AC-09 | WSL 本地部署 | When 在 WSL 执行一键启动，系统**必须**自包含启动前后端全链路且无外部服务依赖 | P1 |
 | AC-10 | 评测 | When 运行评测脚本，系统**必须**输出引用准确率/召回@K 报告 | P1 |
 | AC-11 | 删除同步 | When 删除文档，系统**必须**清理对应向量 BLOB 与 FTS 条目 | P1 |
 | AC-12 | 空状态 | While 知识库无文档，系统**必须**禁用问答并提示"请先上传文档" | P1 |
@@ -171,7 +174,7 @@
 - 性能目标：≤100 页 PDF 解析 <3min；问答首响（非首次模型加载）<8s。
 - 单 PDF >100 页给出分块数预估与耗时提示；空查询不触发检索。
 - 索引写入加锁防并发损坏 SQLite；密钥/端点不入库。
-- 默认 Ollama 后端完全离线；OpenAI 兼容后端需联网，失败明确报错。
+- 默认 Mock 后端完全离线（不下载任何权重）；真实模型（bge-m3 / reranker / docling / LLM）经设置页运行时配置，需联网或本地 Ollama，失败明确报错。
 
 ## 11. 内嵌已知坑（从团队记忆拉取——首次项目，写入基线风险）
 
@@ -181,33 +184,34 @@
 | FTS5 trigram 短中文无召回 | sqlite fts5 trigram | 需≥3连续字符 | 1–2 字中文走 LIKE 兜底 / 加载 trigram 增强扩展 |
 | pdfjs worker 未配置 | pdfjs-dist@^6 | v4+ 必须配 worker | 经 `?url` 引入 GlobalWorkerOptions.workerSrc；旧 bundler 加 Promise.withResolvers polyfill |
 | Docling 扫描件溯源偏移 | docling + 布局模型 | 复杂多栏/跨页表格 | OCR extra 兜底 + 评测集覆盖 |
-| bge-m3 首次权重大/CPU 慢 | flag-embedding bge-m3 | 2.2GB/量化570MB | int8 量化 + 运行时挂载 volume |
+| bge-m3 首次权重大/CPU 慢 | flag-embedding bge-m3 | 2.2GB/量化570MB | int8 量化 + 首次自动拉取缓存 |
 
 ## 12. 端到端验证步骤（Spec 锁定的最后一项）
 
 ```bash
-# 1. 构建并启动（零外部依赖）
-docker compose up --build
+# 0. 启动（WSL 原生，零外部依赖；MOCK 一键）
+cd backend && ./start_mock.sh          # env 全置 mock + uvicorn :8000
 
-# 2. 健康检查
+# 1. 健康检查
 curl http://localhost:8000/api/v1/health
 # 断言：{"status":"ok","db":true,"models":{"embed":"ready"|"loading"}}
 
-# 3. 上传 PDF 并触发索引
+# 2. 上传 PDF 并触发索引
 curl -F "file=@sample.pdf" http://localhost:8000/api/v1/documents
 # 断言：202 + document_id；轮询 GET /documents 至 status=indexed
 
-# 4. 核心成功流（流式问答 + 引用）
+# 3. 核心成功流（流式问答 + 引用）
 curl -N -X POST http://localhost:8000/api/v1/chat -H "Content-Type: application/json" \
   -d '{"query":"本文档第三章的主要结论是什么？"}'
 # 断言：收到 citation 事件含 page 字段；delta 文本含 [n] 标记
 
-# 5. 双后端切换验证
-RAG_LLM_BACKEND=openai RAG_OPENAI_BASE_URL=... RAG_OPENAI_API_KEY=... docker compose up
+# 4. 双后端切换验证（真实模型经设置页运行时配置，或 env 显式开启）
+RAG_LLM_BACKEND=openai RAG_OPENAI_BASE_URL=... RAG_OPENAI_API_KEY=... \
+  ./.venv/bin/python -m uvicorn app.main:app --port 8000
 curl -N -X POST http://localhost:8000/api/v1/chat -d '{"query":"测试问题"}'
 # 断言：走 OpenAI 兼容端点返回带引用回答
 
-# 6. 评测
+# 5. 评测
 curl -X POST http://localhost:8000/api/v1/evaluation/run
 # 断言：返回引用准确率/召回@K 报告
 ```
@@ -226,3 +230,4 @@ curl -X POST http://localhost:8000/api/v1/evaluation/run
 | 2026-08-12-4 | 契约扩展：反馈与追踪 | 新增 `POST /feedback`、`GET /trace/{trace_id}`；trace/feedback 表；query 原文与可反查哈希不落库（query_hash 固定 not_stored）；trace 按租户/用户 ACL 过滤 | Spec §5/§6 |
 | 2026-08-12-5 | 契约扩展：版本化评测 | `/evaluation/run` 默认 profile `public_nist`（NIST 公开 PDF + 自建 gold，18 题；未 prepare 返回 409）；旧 22 条内嵌问答归 `synthetic_smoke`；报告含 CI/切片/per-query/provenance；真实模型适配器 NOT_RUN；基准详情见 docs/BENCHMARK_CARD.md | Spec §5 |
 | 2026-08-12-6 | 契约扩展：运行时模型配置 | 新增 `GET/PUT /config/settings`：LLM 后端/base_url/model/api_key 运行时覆盖（runtime_config 表持久化，覆盖优先于 env 默认，即时生效无需重启；API key 明文存本地 SQLite 且接口只回传 api_key_set）；设置页落地（/settings）；多租户产品化时应收敛为管理员角色 | Spec §5/§6 |
+| 2026-08-20 | WSL 迁移对齐 | 移除 Docker 部署（F8/AC-09/部署章/端到端验证步骤），统一为 WSL 原生 uvicorn+Vite；默认后端 mock，真实模型经 settings 运行时配置覆盖 env | §4/§6/§10/§12 |

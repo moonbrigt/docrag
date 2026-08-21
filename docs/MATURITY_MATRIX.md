@@ -1,7 +1,7 @@
 # DocRAG 成熟度矩阵
 
 > 面向「成熟文档知识产品」验收的逐维度审计表：每个维度标注实现状态、代码位置与证据，未实现项写明原因。
-> 本次文档更新，数据核对日期 2026-08-12。事实来源：`backend/app/**`、`frontend/src/**`、`docker-compose.acceptance.yml`、`work/eval_reports/public_nist_report.json`（评测数字唯一权威）。
+> 本次文档更新，数据核对日期 2026-08-12。事实来源：`backend/app/**`、`frontend/src/**`、`work/eval_reports/public_nist_report.json`（评测数字唯一权威）。
 > 状态图例：✅ 当前有证据（基线已实现且有测试/运行证据）｜🆕 本次成熟度扩展实现｜⬜ 未实现且有原因｜❓ 需要产品决策。
 
 ## 1. 摄取状态机与进度
@@ -29,7 +29,7 @@
 | 项 | 状态 | 实现与证据（代码位置） |
 |----|------|----------------------|
 | 身份模型（Principal） | 🆕 | `backend/app/auth.py`：`Principal(tenant_id, user_id, groups)`；管理员 = `user_id=="admin"` 或组含 `admins` |
-| 可信反向代理身份注入 | 🆕 | 仅 `RAG_TRUSTED_PROXY=true` 时从 `X-Rag-Tenant / X-Rag-User / X-Rag-Group` 头解析身份，否则一律本地默认身份（default/local/无组）；见 `auth.get_principal` + `backend/app/config.py:TRUSTED_PROXY`。nginx 注入示例 `frontend/nginx.conf`（`X-Rag-Tenant "default"`、`X-Rag-User "demo"`），容器内默认开启（`docker-compose.acceptance.yml` 设 `RAG_TRUSTED_PROXY: "true"`） |
+| 可信反向代理身份注入 | 🆕 | 仅 `RAG_TRUSTED_PROXY=true` 时从 `X-Rag-Tenant / X-Rag-User / X-Rag-Group` 头解析身份，否则一律本地默认身份（default/local/无组）；见 `auth.get_principal` + `backend/app/config.py:TRUSTED_PROXY`。WSL 原生无内置代理注入示例；接入反代时需自行注入同名头并按 `RAG_TRUSTED_PROXY=true` 开启（Docker 移除后不再默认开启） |
 | 浏览器无法伪造身份 | 🆕 | CORS `allow_headers` 仅 `Content-Type, Authorization`，不含 `X-Rag-*`（`backend/app/main.py:_cors_origins` 下方中间件）；测试 `test_maturity_acl.py::test_cors_does_not_allow_x_rag_headers`、`::test_local_mode_ignores_identity_headers` |
 | 可见性（fail-closed） | 🆕 | 无权限一律 404 / 空结果，不泄露存在性：租户匹配 +（属主 或 组成员重叠 或 管理员），见 `auth.doc_visible`；测试 `test_maturity_acl.py::test_acl_revoke_fail_closed`（撤权后立即 404） |
 | 管理权限 | 🆕 | 删除 / ACL 修改 / cancel / retry / 版本替换需属主或管理员（`auth.doc_manageable`）；测试 `test_maturity_versions.py::test_versions_require_manage_permission` 等 |
@@ -97,7 +97,7 @@
 | 延迟观测 | 🆕 | 每轮问答 `stage_timings`（retrieving/reranking/generating/total ms）落 trace；进程指标直方图 `pipeline_latency_ms / retrieve_latency_ms / llm_latency_ms / http_request_latency_ms`（`core/metrics.py`） |
 | 取消 / 重试 | 🆕 | 见 §1：原子认领、冲突 409、取消后清理 partial chunks；`retry` 前先确认原文文件存在（避免认领后卡 queued） |
 | 取消的文档化限制 | 🆕 | 无法强杀进行中的 Docling 原生解析线程（线程在事件循环外），只能由阶段守卫停止后续阶段——`pipeline_service.py` 模块注释明示 |
-| 请求超时 | ⬜ | nginx 侧 `proxy_read_timeout/send_timeout 3600s`（`frontend/nginx.conf`）为兜底；应用层无请求级超时/背压。**❓ 需要产品决策**：SSE 长连接超时策略（如生成超时上限） |
+| 请求超时 | ⬜ | WSL 原生无反向代理兜底；应用层无请求级超时/背压。**❓ 需要产品决策**：SSE 长连接超时策略（如生成超时上限） |
 
 ## 10. OCR / 布局 / 多语言
 
@@ -105,7 +105,7 @@
 |----|------|----------------------|
 | 深度 OCR（扫描件） | ⬜ | 未实现且有原因：MVP 聚焦可提取文本 PDF（Spec §3 明确不做「扫描件深度 OCR」）；评测语料为文本型 PDF，**无 OCR 评分**；真实 Docling OCR extra 路径未验证（provenance `NOT_RUN`）。市场对照：Google Document AI OCR 为托管服务，本地采用 Docling OCR extra 需另行评估 |
 | 布局（结构化分块） | ✅ | Docling HybridChunker 结构化分块（`core/parser.py` 透传 `page_no`+归一化 `bbox`+`section`）；bbox 契约有回归测试（`test_parser.py::test_normalize_docling_bbox*`） |
-| 复杂布局（多栏/跨页表格） | ⬜ | 真实 Docling 在本轮容器验收中未执行（`NOT_RUN`），复杂布局质量无实测证据；评测集含 Appendix B 跨页题（nist-006 跨物理页 43/44）作为回归样本 |
+| 复杂布局（多栏/跨页表格） | ⬜ | 真实 Docling 已在 WSL 实测（三篇 PDF → HybridChunker 结构化分块，page_no/bbox/section 溯源已验证）；但复杂布局质量仍无专门基准，评测集含 Appendix B 跨页题（nist-006 跨物理页 43/44）作为回归样本 |
 | 多语言（检索侧） | ✅ | bge-m3 dense+sparse 声明 100+ 语言；FTS 侧 1–2 字中文 LIKE 兜底（`retrieve_service._short_query`） |
 | 多语言（评测实证） | 🆕 | 评测含 2 条中文跨语言题 + 1 条中文 unanswerable（zh 切片 3 题）：zh recall@1 = 0.333 vs en 0.600、zh mrr 0.333 vs en 0.730（数字见 BENCHMARK_CARD §6）——中文跨语言检索弱于英文，真实 bge-m3 未跑，结论待真实模型链路验证 |
 
@@ -122,7 +122,7 @@
 | 自动纠错回路 | ⬜ | 依赖真实链路与运营数据 |
 | 版本回滚操作 | ⬜❓ | 归档数据保留，回滚 UI 需产品决策 |
 | 评测回归门禁 | ⬜❓ | 历史报告已落库，门禁策略需产品决策 |
-| 应用层超时/背压 | ⬜❓ | 目前仅 nginx 长超时兜底 |
+| 应用层超时/背压 | ⬜❓ | WSL 原生无反向代理兜底，应用层无超时/背压 |
 
 ## 12. 市场基线对照（厂商数值不可泛化）
 

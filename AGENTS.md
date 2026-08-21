@@ -12,7 +12,7 @@
 - Node 由 nvm 管理（v24）；非交互 shell 需先 `source ~/.nvm/nvm.sh`，否则 `node`/`npm` 不在 PATH。
 - 模型后端默认 **mock（离线开箱即用，确定性、不下载权重）**；真实模型（bge-m3 / reranker / docling / LLM）需在设置页或 env 显式开启（`RAG_*_MOCK=false`）。
 - 远端唯一事实来源：`https://github.com/moonbrigt/docrag.git`（分支 `main`）。
-- Docker 残留文件（`docker-compose*.yml`、`scripts/docker/`、各处 `Dockerfile`、`frontend/nginx.conf`）为历史遗留，暂不维护，勿作部署依据。
+- Docker 遗留（`docker-compose*.yml`、`scripts/docker/`、各处 `Dockerfile`、`frontend/nginx.conf`）已删除，勿再作部署依据。
 
 ## 目录结构（开发时对照）
 
@@ -25,34 +25,36 @@ docrag/                        # 仓库根（WSL: /home/z1050/Projects/docrag）
 │   ├── app/                   # 业务代码
 │   │   ├── main.py            # 入口（FastAPI 装配，/api/v1 前缀）
 │   │   ├── config.py          # 配置（RAG_ 前缀，pydantic-settings）
+│   │   ├── auth.py            # 身份解析（trusted-proxy 头 → Principal）
+│   │   ├── db.py              # SQLite 连接 + 串行化写（FTS / 向量 BLOB）
 │   │   ├── routes/            # 薄路由（documents/search/chat/eval/meta/trace/config）
 │   │   ├── services/          # 业务：document/pipeline/retrieve/generate/citation/trace
 │   │   ├── repositories/      # 数据访问：chunk/document/trace
-│   │   ├── core/              # 基础设施：embeddings/llm/rerank/db/runtime_config
+│   │   ├── core/              # 基础设施：embeddings/reranker/llm/parser/faiss_store/runtime_config/metrics
 │   │   ├── evaluation/        # 评测 runner + public_dataset + 指标
 │   │   ├── tests/             # smoke + 公开评测测试
 │   │   └── schemas.py         # Pydantic 模型
 │   └── requirements*.txt      # 运行时/dev/eval/ml 依赖
 ├── frontend/                  # React SPA
 │   └── src/
-│       ├── components/        # common（CitationChip 等）/ pages / ...
+│       ├── components/        # common/layout/ui（CitationChip/AppShell/Button 等）
 │       ├── pages/             # Chat / Documents / Evaluation / Settings
 │       ├── api/ lib/ hooks/   # 请求封装 / 工具 / 状态
 │       ├── design/            # DESIGN.md + design-tokens.json（颜色唯一来源）
+│       ├── styles/            # globals.css / tokens.css
 │       └── types/             # 与后端契约对齐的 TS 类型
 ├── docs/                      # SPEC.md / architecture.md / ENGINEERING.md / DEPLOYMENT.md
 │                              # + 成熟度六卡（MATURITY_MATRIX / DATA_CARD / BENCHMARK_CARD
 │                              #   / EVALUATION_PROTOCOL / REPRODUCE / VALIDATION）
-├── scripts/                   # evaluation/*（评测脚本）+ docker/（历史遗留）
-├── work/                      # 评测工作区（被 gitignore，PDF 缓存与报告产物）
-└── docker-compose*.yml        # 历史遗留（已弃用 Docker）
+├── scripts/                   # evaluation/*（评测脚本）
+└── work/                      # 评测工作区（被 gitignore，PDF 缓存与报告产物）
 ```
 
 ## 文档路由（改代码前按序查阅）
 
 | 文档 | 用途 | 权威性 |
 |---|---|---|
-| `docs/README.md` | **唯一事实来源**：速查表、API 清单（11 端点）、裁决记录、维护规则 | ★★★ 冲突时以「源码 + 本文档」为准 |
+| `docs/README.md` | **唯一事实来源**：速查表、API 清单（22 端点）、裁决记录、维护规则 | ★★★ 冲突时以「源码 + 本文档」为准 |
 | `docs/SPEC.md` | 需求契约：MVP 范围、API/DB/页面/Token、EARS 验收标准 | ★★ 锁定期内禁止改范围；变更走 §13 |
 | `docs/architecture.md` | 分层图、数据流、混合检索、部署拓扑 | ★★ 架构事实 |
 | `docs/DEPLOYMENT.md` | 部署、env 一览、真实模型切换、故障排查 | ★★ 部署事实 |

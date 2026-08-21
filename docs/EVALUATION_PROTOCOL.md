@@ -56,7 +56,7 @@ download（DOI → 临时文件 → 尺寸 + SHA-256 双重校验 → rename 落
 
 | 适配器 | 状态 | 说明 |
 |--------|------|------|
-| docling | NOT_RUN（本轮） | 语料用 pypdf 提取；真实 Docling 属容器验收项 |
+| docling | NOT_RUN（本轮） | 语料用 pypdf 提取；真实 Docling 已在 WSL 实测通过（非本轮评测链路） |
 | embedding_bge_m3 | NOT_RUN（本轮） | 无真实权重环境/授权 |
 | reranker_bge | NOT_RUN（本轮） | 同上 |
 | llm | NOT_RUN（本轮） | 无密钥/成本/外传授权 |
@@ -65,7 +65,7 @@ download（DOI → 临时文件 → 尺寸 + SHA-256 双重校验 → rename 落
 
 ## 6. 执行方式
 
-### 6.1 宿主（开发/调试，非正式验收）
+### 6.1 本地（WSL 原生，默认路径）
 
 ```bash
 cd backend
@@ -74,29 +74,15 @@ bash ../scripts/evaluation/prepare.sh          # 默认工作目录 <repo>/work
 # 运行评测（确定性报告）
 bash ../scripts/evaluation/run.sh
 # 复验（无独立脚本，直接调子命令）
-python -m app.evaluation.public_runner --work-dir ../work verify
+./.venv/bin/python -m app.evaluation.public_runner --work-dir ../work verify
 ```
 
 - Python 选择顺序：`VENV_PY` 环境变量 > `backend/.venv` > `python3`（三个脚本一致）。
 - 输出：`work/eval_corpus.json` + `work/eval_reports/public_nist_report.json`（原子写入）。
 
-### 6.2 容器（正式运行与最终验收必须容器内执行）
+### 6.2 Web 评测
 
-```bash
-# 方案 A：Compose run（隔离验收栈 docrag-acceptance）
-docker compose -f docker-compose.acceptance.yml run --rm backend \
-  sh -c "cd /app && python -m app.evaluation.public_runner prepare && python -m app.evaluation.public_runner run"
-
-# 方案 B：一键脚本（子命令直传 prepare/run/verify，`./work:/work` 绑定挂载读写宿主 work/）
-./scripts/docker/manage.sh up          # 起栈（build/up 见 REPRODUCE.md §3）
-./scripts/docker/manage.sh eval prepare   # 容器内 prepare（首次需联网下载 PDF）
-./scripts/docker/manage.sh eval run       # 容器内跑 public_nist 评测，报告落在宿主 work/eval_reports/
-```
-
-> `manage.sh eval` 于 2026-08-12 修复：子命令直传 + `./work:/work` 挂载（见方案 B），不再有 `--profile` 参数问题。
-
-- 容器内评测工作目录为 `/work`（compose 已声明 `./work:/work` 绑定挂载），PDF 缓存与报告直接落在宿主 `work/`，`run --rm` 后无需额外取回。
-- 通过 `POST /api/v1/evaluation/run` 走 Web 评测时，后端读容器内 `work/eval_corpus.json`；未 prepare 返回 409（见 §7）。
+- 通过 `POST /api/v1/evaluation/run` 走 Web 评测时，后端读 `work/eval_corpus.json`；未 prepare 返回 409（见 §7）。
 
 ## 7. 失败处理
 

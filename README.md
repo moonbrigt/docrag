@@ -1,16 +1,15 @@
 # DocRAG — 可本地部署的文档 RAG Web 应用
 
-**本地、零外部依赖的 PDF 文档问答系统** —— 从 PDF 上传到带页码引用的回答，一条 `docker compose` 起全套。
+**本地、零外部依赖的 PDF 文档问答系统** —— 从 PDF 上传到带页码引用的回答，一条命令起前后端，全程离线可跑。
 
 ![CI](https://github.com/moonbrigt/docrag/actions/workflows/ci.yml/badge.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688)
 ![React](https://img.shields.io/badge/React-19-61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6)
 ![SQLite+FTS5](https://img.shields.io/badge/SQLite-FTS5%2BFAISS-003B57)
-![Docker](https://img.shields.io/badge/Docker-Compose-2496ED)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
-> PDF 上传 → Docling 解析（保留页码溯源）→ 结构化分块 → 向量(SQLite+FAISS) + 关键词(SQLite FTS5) 混合检索 → Rerank → 带精准页码引用的回答 → PDF 原文预览。默认本地 Ollama、可切 OpenAI 兼容 API（前端设置页运行时配置，无需改环境变量）。
+> PDF 上传 → Docling 解析（保留页码溯源）→ 结构化分块 → 向量(SQLite+FAISS) + 关键词(SQLite FTS5) 混合检索 → Rerank → 带精准页码引用的回答 → PDF 原文预览。模型默认离线 mock（开箱即用，不下载任何权重）；真实模型（bge-m3 / reranker / docling / LLM）在设置页运行时配置后端，无需改环境变量。运行环境唯一为 **WSL（Ubuntu）**，Docker 已弃用。
 
 <details>
 <summary>📑 目录</summary>
@@ -31,8 +30,8 @@
 
 ## 最新动态
 
-- **2026-08-12** 真实 Docling 解析链路在容器内 VERIFIED（NIST 报告 48 页真实摄取，mock 仅 5 页）；检索消融对比（BM25 / 稠密 / 混合 / 混合+重排）与失败案例分析入库；评测质量门禁上线（CI 云端实测通过）
-- **2026-08-12** 成熟度升级：租户 ACL、文档版本生命周期、无答案状态、反馈与追踪、设置页运行时模型配置；76 项后端测试全绿
+- **2026-08-20** WSL 迁移完成：移除 Docker（compose/Dockerfile/nginx.conf/验收栈），唯一运行环境为 WSL 原生；默认离线 MOCK，真实模型经设置页运行时配置
+- **2026-08-12** 成熟度升级：租户 ACL、文档版本生命周期、无答案状态、反馈与追踪、设置页运行时模型配置；后端测试全绿
 - **2026-08-12** 公开评测集上线：2 份 NIST 报告（SHA-256 校验）+ 18 题页码/证据 gold，无密钥基线 Recall@5 0.844 / MRR 0.747（bootstrap+Wilson 95% CI）
 
 ## 界面预览
@@ -53,15 +52,15 @@
 
 | 编号 | 功能 | 说明 |
 |------|------|------|
-| F1 | PDF 上传 + Docling 解析 | 解析结果保留 `page_no` 与 `bbox` 坐标，支撑像素级溯源 |
+| F1 | PDF 上传 + Docling 解析 | 解析结果保留 `page_no` 与 `bbox` 坐标，支撑像素级溯源（可换 pdf/mock 后端） |
 | F2 | 结构化分块 | 按文档结构边界切分，每块携带溯源元数据（页码/章节/坐标） |
 | F3 | 混合检索 | 稠密向量（FAISS）+ 关键词（FTS5）双路召回，RRF(k=60) 融合 |
 | F4 | Rerank | bge-reranker-v2-m3 本地精排，默认开启、不可静默跳过 |
-| F5 | 带页码引用回答 | 双后端 LLM（Ollama / OpenAI 兼容，env 切换），回答内联 `[n]` 引用，引用携带 sourceId/version/title/createdAt |
+| F5 | 带页码引用回答 | 多后端 LLM（mock/Ollama/OpenAI 兼容），回答内联 `[n]` 引用，引用携带 sourceId/version/title/createdAt |
 | F6 | PDF 原文预览 + 高亮 | pdf.js 渲染，点击引用跳页并按 `bbox` 高亮段落；答案可导出 JSON v1（不可变 source manifest） |
 | F7 | 多语言嵌入 | bge-m3（dense+sparse 一体），中英混合开箱可用（评测含 2 条中文跨语言题） |
-| F8 | Docker 零依赖部署 | 单 compose 启动，无外部服务依赖；另有隔离验收栈 `docrag-acceptance`（`manage.sh` 一键管理） |
-| F9 | 版本化评测 | 默认 `public_nist`：2 份 NIST 公开 PDF / 18 题（16 answerable + 2 unanswerable，含 2 条中文跨语言题）+ 自建页码 gold（非 NIST 官方 benchmark）；Recall/Precision/Hit@K、MRR、nDCG、引用与答案指标、bootstrap/Wilson CI、四维切片、provenance（真实模型 NOT_RUN）；旧 22 条手写问答为 `synthetic_smoke` |
+| F8 | 本地零依赖部署 | WSL 原生一条命令起全套（默认 MOCK 离线），无外部服务依赖 |
+| F9 | 版本化评测 | 默认 `public_nist`：2 份 NIST 公开 PDF / 18 题（16 answerable + 2 unanswerable，含 2 条中文跨语言题）+ 自建页码 gold（非 NIST 官方 benchmark）；Recall/Precision/Hit@K、MRR、nDCG、引用与答案指标、bootstrap/Wilson CI、四维切片、provenance（真实模型大多 NOT_RUN）；旧 22 条手写问答为 `synthetic_smoke` |
 | F10 | 多文档管理 | 上传列表、删除（同步清理向量/FTS 条目）、8 态状态机（含 warning/failed/cancelled）、cancel/retry 原子认领 |
 | F11 | 文档生命周期与版本 | source_id + version + is_active/archived_at；索引成功才发布新版本（旧版归档）；版本列表与替换入口 |
 | F12 | ACL 与租户隔离 | 租户 + 属主/组/管理员两级权限，fail-closed（无权限 404/空结果）；身份经可信反向代理注入（`RAG_TRUSTED_PROXY`），浏览器不可伪造；ACL 管理与撤权即时生效 |
@@ -76,9 +75,9 @@
 
 ```
 浏览器 (React SPA)
-   │  /api/v1  (nginx 反代)
+   │  /api/v1  (Vite 代理开发 / 静态托管生产)
    ▼
-FastAPI 网关
+FastAPI 网关 (:8000)
    ├─ 上传 → ParseService(Docling: page_no+bbox)
    │         → ChunkService(HybridChunker, 溯源元数据)
    │         → IndexService(bge-m3 dense→SQLite BLOB + FAISS; keyword→FTS5)
@@ -98,9 +97,8 @@ flowchart LR
     subgraph 浏览器
         UI[React SPA<br/>文档库/问答/评测/设置]
     end
-    subgraph 容器[docker compose · nginx :3002]
-        NG[nginx<br/>SPA + API 反代<br/>注入可信身份头]
-        API[FastAPI /api/v1]
+    subgraph 运行[WSL 原生 · 本机]
+        API[FastAPI :8000 /api/v1]
         subgraph 管道
             UP[上传] --> P[Docling 解析<br/>page_no+bbox]
             P --> C[结构化分块]
@@ -119,8 +117,7 @@ flowchart LR
         DB[(SQLite+FTS5<br/>FAISS 内存索引)]
         EVAL[评测 public_nist<br/>NIST PDF+gold]
     end
-    UI --> NG
-    NG --> API
+    UI --> API
     API --> 管道
     API --> ACL
     API --> LS
@@ -139,52 +136,42 @@ flowchart LR
 |----|------|
 | 前端 | React 19 + Vite 8 + TypeScript 5.6 + Tailwind CSS 4 + Radix UI + lucide-react（SVG 图标，禁 emoji）+ pdfjs-dist 6 |
 | 后端 | FastAPI 0.115 + Pydantic 2.11 + Uvicorn |
-| 解析 | docling 2.117（DocumentConverter + HybridChunker，prov 透传 page_no+bbox） |
-| 嵌入 | BAAI/bge-m3（FlagEmbedding，dense+sparse 一体） |
+| 解析 | docling（DocumentConverter + HybridChunker，prov 透传 page_no+bbox）；可换 pdf/mock |
+| 嵌入 | bge-m3（FlagEmbedding，dense+sparse）；可换 http（OpenAI 兼容）/ mock |
 | 向量 | SQLite(BLOB) + FAISS 1.14.3（IndexFlatIP，归一化后 = cosine） |
 | 关键词 | SQLite FTS5（trigram，≤2 字中文 LIKE 兜底） |
-| 重排 | BAAI/bge-reranker-v2-m3（本地 CrossEncoder） |
+| 重排 | bge-reranker-v2-m3（本地 CrossEncoder）；可换 mock |
 | 融合 | RRF(k=60) |
-| LLM | openai SDK + base_url 切换（Ollama 默认 / OpenAI 兼容） |
-| 部署 | 单 docker-compose（nginx 托管前端 + 反代 API，backend 独立服务） |
+| LLM | openai SDK + base_url 切换（mock / Ollama / OpenAI 兼容） |
+| 部署 | WSL（Ubuntu）原生：backend venv + uvicorn，前端 Vite dev/build |
 
 ---
 
 ## 快速开始
 
-### 方式一：Docker 一键部署（推荐）
+### 一键启动（WSL）
 
 ```bash
-cd docrag
-docker compose up --build
-# 访问 http://localhost:3002
+cd /home/z1050/Projects/docrag
+
+# 后端：一键离线 MOCK 启动（env 全部置 mock + uvicorn :8000）
+cd backend && ./start_mock.sh
+
+# 前端（另开终端，frontend/ 下）
+cd frontend && source ~/.nvm/nvm.sh && npm run dev   # http://localhost:5173
 ```
 
-默认以 **MOCK 后端** 启动，可完全离线端到端演示（解析/嵌入/重排/LLM 均走确定性 mock，不下载大模型）。切换到真实模型见 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)。
+默认以 **MOCK 后端** 启动，可完全离线端到端演示（解析/嵌入/重排/LLM 均走确定性 mock，不下载大模型）。进入前端「设置」页即可运行时切换到真实模型（详见 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)）。
 
-隔离验收栈（不与原卷冲突）：
-
-```bash
-./scripts/docker/manage.sh build      # docker compose -f docker-compose.acceptance.yml build
-./scripts/docker/manage.sh up         # 起栈 → http://127.0.0.1:3302（health 就绪）
-./scripts/docker/manage.sh status     # 状态/health
-./scripts/docker/manage.sh down       # 停栈（不带 -v，保留 draccept_* 数据卷）
-```
-
-### 方式二：本地开发
+### 手动启动
 
 ```bash
 # 后端
 cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt -r requirements-dev.txt -r requirements-eval.txt
-cp .env.example .env   # 可选：开启 MOCK 以便离线运行
-uvicorn app.main:app --reload --port 8000
+./.venv/bin/python -m uvicorn app.main:app --reload --port 8000
 
 # 前端（另开终端）
-cd frontend
-npm install
-npm run dev            # http://localhost:5173
+cd frontend && source ~/.nvm/nvm.sh && npm run dev   # http://localhost:5173
 ```
 
 ---
@@ -198,12 +185,10 @@ npm run dev            # http://localhost:5173
 bash scripts/evaluation/prepare.sh
 # 运行确定性评测（报告原子写入 work/eval_reports/public_nist_report.json）
 bash scripts/evaluation/run.sh
-# 容器内运行（子命令直传：prepare / run / verify）
-./scripts/docker/manage.sh eval run
-# 浏览器：评测看板页 http://localhost:3002/evaluation（默认 public_nist，可选 synthetic_smoke）
+# 浏览器：评测看板页 http://localhost:5173/evaluation（默认 public_nist，可选 synthetic_smoke）
 ```
 
-指标：**Recall/Precision/Hit@K + hard-negative**、**MRR**、**nDCG@K**、**引用页精度/召回**、**答案 EM/F1**（exact/set/rubric/numeric 容差/弃答）、**bootstrap/Wilson 95% CI**、**language/answer_type/tag/document 四维切片**；报告含 provenance（真实模型适配器本轮全部 NOT_RUN）与确定性自检。数字与口径见 [`docs/BENCHMARK_CARD.md`](docs/BENCHMARK_CARD.md)，协议见 [`docs/EVALUATION_PROTOCOL.md`](docs/EVALUATION_PROTOCOL.md)。旧 22 条内嵌问答为 `synthetic_smoke`（`python -m app.evaluation.runner`）。
+指标：**Recall/Precision/Hit@K + hard-negative**、**MRR**、**nDCG@K**、**引用页精度/召回**、**答案 EM/F1**（exact/set/rubric/numeric 容差/弃答）、**bootstrap/Wilson 95% CI**、**language/answer_type/tag/document 四维切片**；报告含 provenance（真实模型适配器大多 NOT_RUN）与确定性自检。数字与口径见 [`docs/BENCHMARK_CARD.md`](docs/BENCHMARK_CARD.md)，协议见 [`docs/EVALUATION_PROTOCOL.md`](docs/EVALUATION_PROTOCOL.md)。旧 22 条内嵌问答为 `synthetic_smoke`（`python -m app.evaluation.runner`）。
 
 ### 主基线结果（2026-08-12，BM25 + 词法重排 + 抽取式答案，无密钥）
 
@@ -228,7 +213,7 @@ bash scripts/evaluation/run.sh
 
 ## 可观测性
 
-- **结构化日志**：所有日志为 JSON 单行（时间/级别/模块/消息/上下文字段），便于容器采集。
+- **结构化日志**：所有日志为 JSON 单行（时间/级别/模块/消息/上下文字段）。
 - **指标端点**：`GET /api/v1/metrics` 暴露进程内计数器与延迟直方图：
   - 计数器：`document_uploads_total`、`documents_indexed_total`、`documents_failed_total`、`queries_total`、`citations_returned_total`、`errors_total`
   - 直方图：`http_request_latency_ms`、`pipeline_latency_ms`、`retrieve_latency_ms`、`llm_latency_ms`
@@ -242,27 +227,26 @@ bash scripts/evaluation/run.sh
 docrag/
 ├── backend/                 # FastAPI 后端
 │   ├── app/
-│   │   ├── api/             # 请求封装（无，路由直接暴露于 routes）
-│   │   ├── core/            # embeddings / faiss_store / parser / reranker / llm / logging / metrics
-│   │   ├── repositories/    # 数据访问（SQLite + FTS5）
-│   │   ├── routes/          # documents / search / chat / meta / evaluation
-│   │   ├── services/        # pipeline / document / index / retrieve / rerank / generate / citation
-│   │   ├── evaluation/      # dataset.json + runner（指标计算）
-│   │   └── tests/           # smoke + 评测测试
-│   ├── requirements.txt     # 运行时依赖（精简）
-│   ├── requirements-dev.txt # 开发/测试依赖
-│   └── Dockerfile
+│   │   ├── core/            # parser / embeddings / reranker / llm / faiss_store / runtime_config / accelerator / metrics / logging / errors
+│   │   ├── repositories/    # document / chunk / trace（SQLite + FTS5）
+│   │   ├── routes/          # documents / search / chat / meta / config / trace / evaluation
+│   │   ├── services/        # pipeline / document / index / retrieve / rerank / generate / citation / trace
+│   │   ├── evaluation/      # public_runner / public_dataset / eval_metrics / baselines + datasets/
+│   │   └── tests/           # smoke + 成熟度 + 评测（79 项）
+│   ├── requirements*.txt    # 运行时 / 开发 / 评测 / 真实模型 四档依赖
+│   └── start_mock.sh        # 一键离线 MOCK 启动
 ├── frontend/                # React SPA
 │   ├── src/
 │   │   ├── components/      # common / layout / ui（单一职责，单文件 ≤300 行）
-│   │   ├── pages/           # Home / Documents / Chat / Evaluation
+│   │   ├── pages/           # Home / Documents / Chat / Evaluation / Settings
 │   │   ├── api/ lib/ hooks/ # 请求封装 / 工具 / 状态
-│   │   └── design/         # DESIGN.md + design-tokens.json（双主题 Token）
-│   └── Dockerfile + nginx.conf
-├── docs/                    # SPEC.md / architecture.md / ENGINEERING.md / DEPLOYMENT.md
+│   │   ├── design/          # DESIGN.md + design-tokens.json（双主题 Token）
+│   │   ├── styles/ types/   # globals.css / tokens.css；与后端契约对齐的 TS 类型
+│   └── package.json         # React 19 / Vite 8 / TS 5.6 / Tailwind 4 / Radix / Lucide / pdfjs
+├── docs/                    # README / SPEC / architecture / ENGINEERING / DEPLOYMENT
 │                            # + 成熟度六卡：MATURITY_MATRIX / DATA_CARD / BENCHMARK_CARD
 │                            #   / EVALUATION_PROTOCOL / REPRODUCE / VALIDATION
-└── docker-compose.yml       # 单 compose 起全套（默认 MOCK）；验收栈 docker-compose.acceptance.yml
+└── scripts/evaluation/      # download / prepare / run / gate（评测门禁，CI 与本地通用）
 ```
 
 ---
@@ -281,7 +265,7 @@ docrag/
 
 - 分层架构（routes → services → repositories），依赖只向下；入口零业务逻辑。
 - 单文件 ≤ 300 行；P0 红线：禁 emoji 图标、禁紫粉渐变、禁硬编码色与模板味文案。
-- 测试与文档驱动：每个 Phase 产出落盘，三文档（PRD / 技术选型 / 设计方向）经用户确认后生成 Spec 契约。
+- 测试与文档驱动：每个 Phase 产出落盘，捆为 Spec 契约。
 
 ---
 
@@ -290,7 +274,7 @@ docrag/
 <details>
 <summary><b>完全离线可用吗？</b></summary>
 
-可以。默认 MOCK 模式零外部依赖（解析/嵌入/重排/LLM 全部确定性 mock，不下载任何权重），一条 compose 即可演示全链路；真实 Docling 解析在 acceptance 镜像档已容器内验证（48 页真实摄取）。接入真实 LLM 只需在设置页填后端/Base URL/Key。
+可以。默认 MOCK 模式零外部依赖（解析/嵌入/重排/LLM 全部确定性 mock，不下载任何权重），一条 `./start_mock.sh` 即可演示全链路；真实 Docling 解析已在 WSL 实测通过。接入真实 LLM 只需在设置页填后端/Base URL/Key。
 </details>
 
 <details>
@@ -312,15 +296,15 @@ docrag/
 </details>
 
 <details>
-<summary><b>如何接入 OpenAI 兼容 API？</b></summary>
+<summary><b>如何接入 OpenAI 兼容 API 或本地模型？</b></summary>
 
-打开「设置」页 → LLM 后端选 OpenAI 兼容 API → 填 Base URL / 模型名 / API Key → 保存即生效（无需改环境变量或重建镜像）。API Key 只存本地 SQLite 且接口不回显明文。
+打开「设置」页 → 各模块选后端（LLM 选 OpenAI 兼容或 Ollama；嵌入选 http 或 bge-m3）→ 填 Base URL / 模型名 / API Key → 保存即生效（无需改环境变量）。API Key 只存本地 SQLite 且接口不回显明文。切换嵌入模型后需「重新索引全部文档」。
 </details>
 
 <details>
 <summary><b>与 RAGFlow / Dify / privateGPT 有什么不同？</b></summary>
 
-DocRAG 定位是轻量可本地部署的文档问答产品：零外部依赖一条 compose 起全套、引用精确到页码+bbox 高亮、内置可复现公开评测与质量门禁。它不做低代码编排（Dify）或平台级任务流（RAGFlow），代码量小、易读易改，适合作为自托管知识库起点。
+DocRAG 定位是轻量可本地部署的文档问答产品：零外部依赖一条命令起全套、引用精确到页码+bbox 高亮、内置可复现公开评测与质量门禁。它不做低代码编排（Dify）或平台级任务流（RAGFlow），代码量小、易读易改，适合作为自托管知识库起点。
 </details>
 
 ## 工程说明

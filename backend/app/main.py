@@ -83,7 +83,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     # 安全约束：allow_headers 不得包含 X-Rag-*（身份头只允许可信反向代理
-    # 注入，浏览器无法伪造）。RAG_TRUSTED_PROXY=true 时 nginx 负责设置。
+    # 注入，浏览器无法伪造）。RAG_TRUSTED_PROXY=true 时由反向代理负责设置。
     allow_headers=["Content-Type", "Authorization"],
 )
 

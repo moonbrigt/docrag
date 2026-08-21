@@ -31,7 +31,7 @@ flowchart TB
     subgraph MODEL["模型层 (本地优先)"]
         EMB["Embedder\nBAAI/bge-m3 (dense+sparse)"]
         RR["Reranker\nbge-reranker-v2-m3"]
-        LLM["LLM\nOllama 默认 / OpenAI 兼容"]
+        LLM["LLM\nmock 默认 / Ollama|OpenAI 兼容"]
     end
 
     subgraph STORE["存储层 (零外部服务)"]
@@ -98,46 +98,34 @@ flowchart LR
 
 ## 4. 部署拓扑
 
-### 4.1 常规部署（docker-compose.yml，零外部服务）
+运行环境唯一为 **WSL（Ubuntu）** 原生；Docker 已弃用并移除，无容器/nginx 反代。
 
 ```mermaid
 flowchart LR
-    BROWSER[浏览器] --> NGINX[nginx\n前端静态 + 反向代理]
-    NGINX --> API[FastAPI 容器\n(uvicorn/gunicorn)]
-    API --> VOL[(volume: SQLite + PDF 原件\n+ 模型权重 HuggingFace/Ollama)]
-    API -.->|默认本地| OLLAMA[(Ollama 可选容器\nLLM 服务)]
+    BROWSER[浏览器] --> FE[前端\nVite dev :5173 / build 静态]
+    FE -->|/api/v1 代理| API[FastAPI :8000]
+    API --> DB[(SQLite + PDF 原件)]
+    API --> MOD[(模型权重\nHuggingFace / Ollama)]
+    API -.->|可选| OLLAMA[(Ollama 本地\nLLM 服务)]
 ```
 
-### 4.2 隔离验收栈（docker-compose.acceptance.yml，project `docrag-acceptance`）
-
-```mermaid
-flowchart LR
-    HOST[宿主入口 127.0.0.1:3302] --> FE[frontend 容器\nnginx:1.27-alpine\nSPA + 反代 /api]
-    FE -->|身份头注入 X-Rag-Tenant/User| BE[backend 容器\nFastAPI + uvicorn\n默认全 MOCK + RAG_TRUSTED_PROXY=true]
-    BE --> D[(draccept_data:/data\nSQLite + PDF 原件)]
-    BE --> M[(draccept_models:/models)]
-    BE --> W[(./work:/work\n评测缓存与报告)]
-    BE -->|healthcheck /api/v1/health| HOST
-```
-
-- 端口：`127.0.0.1:3302:80`（唯一宿主入口）；backend 8000 仅容器网络内访问（nginx 反代）。
-- 卷：`draccept_data`、`draccept_models`（与旧 `docrag_docrag_*` 卷完全隔离）+ `./work:/work` 评测目录绑定挂载。
-- 身份：nginx 注入 `X-Rag-Tenant "default"` / `X-Rag-User "demo"`（`frontend/nginx.conf`），backend `RAG_TRUSTED_PROXY=true` 时解析；浏览器无法伪造（CORS allow_headers 不含 X-Rag-*）。
-- 管理：`scripts/docker/manage.sh`（build/up/down/status/logs/eval 等；down 不带 `-v` 保留数据卷）。
+- 后端：`backend/.venv/bin/python -m uvicorn app.main:app --port 8000`（MOCK 用 `./start_mock.sh`）。
+- 前端：`frontend` 下 `npm run dev`（开发，Vite 代理 `/api` 到 8000）或 `npm run build` 产出静态文件。
+- 数据/模型：项目目录下由 `RAG_DATA_DIR`/`RAG_DB_PATH`/`RAG_MODEL_DIR` 指定。
 
 ## 5. 身份与 ACL 数据流（成熟度扩展）
 
 ```mermaid
 sequenceDiagram
     participant U as 用户/浏览器
-    participant N as nginx（可信反向代理）
+    participant N as 反向代理（可选，WSL 默认直连无代理）
     participant B as FastAPI
     participant S as 检索/文档服务
 
     U->>N: 任意请求（无法携带 X-Rag-*，CORS 白名单不含）
-    N->>N: 注入 X-Rag-Tenant/User/Group（default/demo）
+    N->>N: 注入 X-Rag-Tenant/User/Group（需接入方自行注入）
     N->>B: /api/v1/*
-    B->>B: get_principal：RAG_TRUSTED_PROXY=true 时解析身份头<br/>否则本地默认身份（default/local）
+    B->>B: get_principal：仅 RAG_TRUSTED_PROXY=true 时解析身份头<br/>否则本地默认身份（default/local）
     B->>S: resolve_scope：可见文档 = 租户匹配 ∩（属主 ∪ 组重叠 ∪ 管理员）
     S->>S: FAISS 全局 top-k → chunk→文档映射 → 范围过滤<br/>FTS5 以范围 IN 直查；两路带范围后才 RRF 融合
     S-->>U: 无权限 = 404 / 空结果（fail-closed，不泄露存在性）
@@ -191,15 +179,15 @@ flowchart LR
 ```
 
 - 硬规则：gold 只作评估输入，绝不进入检索/生成管线（`run_baseline` 仅用 query；有守护测试）。
-- 报告含 `provenance`（docling/embedding/reranker/llm 四适配器，本轮全部 NOT_RUN）与 `determinism.verified`（去除 created_at 后字节一致）。
-- 容器内执行：`manage.sh eval prepare|run|verify`（`./work:/work` 挂载，直接读写宿主 work/）。
+- 报告含 `provenance`（docling/embedding/reranker/llm 四适配器，真实模型大多 NOT_RUN）与 `determinism.verified`（去除 created_at 后字节一致）。
+- 本地执行：`scripts/evaluation/{prepare,run,gate}.sh`（CI 与本地通用，读写 `work/`）与 `POST /api/v1/evaluation/run`。
 
 ## 8. 关键设计决策
 
 | 决策 | 选型 | 为什么（权衡） |
 |------|------|----------------|
 | 页码溯源 | Docling `prov.page_no + bbox` | 解析即带坐标，全链路透传，做到像素级高亮跳转，而非语义模糊引用 |
-| 向量存储 | SQLite(BLOB) + FAISS | 零外部服务、单文件、一条 compose 起；>100万 chunk 才需 IVF（非 MVP） |
+| 向量存储 | SQLite(BLOB) + FAISS | 零外部服务、单文件；>100万 chunk 才需 IVF（非 MVP） |
 | 关键词检索 | SQLite FTS5 trigram | 中英子串零依赖；1–2 字中文 LIKE 兜底 |
 | 融合 | RRF(k=60) | 异构分数（cosine/BM25）免标定融合，鲁棒 |
 | 重排 | bge-reranker-v2-m3 本地 | 多语言、零 API 成本、默认开启不可静默降级 |

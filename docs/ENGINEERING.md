@@ -1,13 +1,13 @@
 # DocRAG 工程说明
 
-DocRAG 是一套可本地部署、保留 PDF 页码与坐标溯源的文档问答系统。系统覆盖解析、结构化分块、混合检索、重排、流式生成、引用定位、质量评测和容器化部署。
+DocRAG 是一套可本地部署、保留 PDF 页码与坐标溯源的文档问答系统。系统覆盖解析、结构化分块、混合检索、重排、流式生成、引用定位、质量评测和本地部署。
 
 ## 1. 系统范围
 
 | 项 | 内容 |
 |----|------|
 | 应用形态 | React 单页应用 + FastAPI API + 本地模型与存储 |
-| 技术栈 | React 19、Vite、TypeScript、Tailwind CSS、FastAPI、Pydantic、Docling、FAISS、SQLite FTS5、pdf.js、Docker |
+| 技术栈 | React 19、Vite、TypeScript、Tailwind CSS、FastAPI、Pydantic、Docling、FAISS、SQLite FTS5、pdf.js |
 | 核心能力 | PDF 溯源、混合检索、RRF 融合、多语言重排、带引用回答、原文高亮 |
 | 运行方式 | 默认离线 MOCK；可切换本地 Ollama 或 OpenAI 兼容接口 |
 
@@ -70,22 +70,22 @@ Query → FAISS 稠密召回 + FTS5 关键词召回 → RRF(k=60) 融合 → bge
 - ACL：租户 + 属主/组/管理员，可信反向代理身份注入，检索范围与 trace 访问控制。
 - 反馈与追踪：feedback 表、`GET /trace/{id}`（query 原文不落库）。
 - 版本化评测：public_nist（18 题 NIST 公开语料）+ synthetic_smoke（22 条），CI/切片/provenance/确定性报告。
-- nginx 前端、FastAPI 后端、SQLite/模型持久卷组成的 Docker Compose 部署（含隔离验收栈 docrag-acceptance）。
+- WSL 原生部署：后端 venv + uvicorn，前端 Vite dev/build（Docker 已移除）。
 
 ## 6. 验证状态
 
 | 检查 | 当前结果 |
 |------|----------|
-| 后端测试 | **61 个测试项通过**（2026-08-12 复核，含 4 个成熟度测试文件与公开评测测试） |
+| 后端测试 | **79 个测试项通过**（2026-08-20 复核，含 4 个成熟度测试文件与公开评测测试） |
 | 前端静态检查 | ESLint 零告警、TypeScript/Vite 构建通过 |
-| Docker | 验收栈 `docrag-acceptance` 构建并 healthy（backend/frontend 镜像见 VALIDATION.md §4）；容器内 pytest 61 passed、public_nist 评测与宿主一致 |
+| WSL 原生运行 | 后端 uvicorn + 前端 Vite：pytest 79 passed、public_nist 评测通过 |
 | HTTP 链路 | 首页、健康检查、PDF 文件、SSE citation、no_answer、feedback、trace、版本、ACL 已验证 |
 | 评测 | 无密钥基线指标 + bootstrap/Wilson CI + 四维切片，报告确定性字节一致（复跑验证） |
 | bbox 契约 | TOPLEFT/BOTTOMLEFT 转换、按页归一化、边界夹取有回归测试 |
 
 ## 7. 已知边界
 
-- 默认 Compose 使用确定性 MOCK，真实 Docling、bge-m3、reranker 与本地 LLM 的组合链路尚未完成同等强度的端到端验证（provenance 全部 NOT_RUN）。
+- 默认使用确定性 MOCK，真实 Docling、bge-m3、reranker 与本地 LLM 的组合链路尚未完成同等强度的端到端验证（provenance 大多 NOT_RUN；Docling 真实解析已在 WSL 实测通过）。
 - 无内置认证（OIDC/SSO 未实现）：身份由可信反向代理注入，多租户生产方案需产品决策。
 - 当前为单 SQLite 连接设计，未实现限流与横向扩展。
 - FAISS 使用内存平面索引，适合当前数据规模；百万级以上需要更换索引结构或存储方案。

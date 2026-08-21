@@ -4,28 +4,26 @@ DocRAG 是独立开源项目，欢迎以 issue 形式提问与反馈；代码贡
 
 ## 环境
 
-- Python 3.11+（后端），Node 20+（前端），Docker + Compose v2（容器验收）
-- 离线演示无需任何模型权重：compose 默认 `RAG_*_MOCK=true`
+- Python 3.12（后端，venv `backend/.venv`），Node（前端，经 nvm 管理 v24）；限 WSL（Ubuntu）环境。
+- 离线演示无需任何模型权重：默认 `RAG_*_MOCK=true`；真实模型需在设置页或 env 显式开启。
 
 ## 本地开发
 
 ```bash
-# 后端
-cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt -r requirements-dev.txt -r requirements-eval.txt
-uvicorn app.main:app --reload --port 8000   # 本地开发需设 RAG_*_MOCK=true（见 .env.example）
+# 后端（backend/ 下）
+source ~/.nvm/nvm.sh   # WSL 下需先加载 nvm（若需 node/npm）
+./.venv/bin/python -m uvicorn app.main:app --reload --port 8000   # MOCK 用 ./start_mock.sh
 
-# 前端
-cd frontend && npm install && npm run dev   # http://localhost:5173
+# 前端（frontend/ 下）
+npm install && npm run dev   # http://localhost:5173
 ```
 
 ## 提交前门禁（必须全绿）
 
 ```bash
-cd backend && python -m pytest -q          # 全量测试（当前 68 项）
-python -m compileall -q app                # 语法检查
-cd ../frontend && npm run build            # tsc --noEmit + vite build
+cd backend && ./.venv/bin/python -m pytest -q   # 全量测试（当前 79 项）
+./.venv/bin/python -m compileall -q app         # 语法检查
+cd ../frontend && npm run build                 # tsc --noEmit + vite build
 ```
 
 - 分层纪律：`routes`（薄路由）→ `services`（业务）→ `repositories`（数据访问）→ `core`（基础设施）；依赖只向下，单文件 ≤300 行。
