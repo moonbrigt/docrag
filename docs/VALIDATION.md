@@ -64,7 +64,7 @@
 - 真实语料检索：query "risk management framework" 命中 page 3/26/44 等真实相关页
 - chat SSE 全链路（stage/delta/citation/done）：引用页码 3/44/26/7/9 均为 AI RMF 相关章节，citation 含真实 bbox 与 snippet
 - 结论：**Docling 真实解析 = VERIFIED**（CPU，48 页 + TableFormer 首次含模型下载约 506MB，全流程约 8 分钟）；bge-m3 嵌入与对话分别走 Ollama 本地模型已验证；bge-reranker-v2-m3 真实 CrossEncoder 已于 2026-08-21 在消融评测中加载验证（见下条）
-- 真实模型全链路消融（2026-08-21，`backend/app/evaluation/real_full_runner.py`）：bge-m3（FlagEmbedding 本地权重）+ bge-reranker-v2-m3（CrossEncoder，CPU）+ 真实云端 LLM 三变体消融，18 题全跑通；hybrid_rerank_llm recall@5 0.9375 / MRR 0.9062 / answer EM 0.333 / unanswerable 1.0；检索指标跨 4 次运行一致（确定性成立），报告 `work/real_full_report.json`（数字与边界见 BENCHMARK_CARD §12）
+- 真实模型全链路消融（2026-08-21，`backend/app/evaluation/real_full_runner.py`）：bge-m3（FlagEmbedding 本地权重）+ bge-reranker-v2-m3（CrossEncoder，CPU）+ 真实云端 LLM 四变体消融，18 题全跑通；hybrid_rerank_llm recall@5 0.9375 / MRR 0.9062 / answer EM 0.333 / unanswerable 1.0；词法 vs 神经重排同口径对比：词法零增益（MRR 持平 0.752）、神经 +0.154；检索指标跨 run 一致（确定性成立），报告 `work/real_full_report.json` + `work/real_full_lexical.json`（数字与边界见 BENCHMARK_CARD §12）
 
 ## 5. 已知问题清单（2026-08-20 核对）
 

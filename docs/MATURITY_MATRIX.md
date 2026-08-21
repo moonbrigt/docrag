@@ -87,7 +87,7 @@
 | 指标 + CI + 切片 | 🆕 | Recall/Precision/Hit@K、MRR、nDCG@K、citation page precision/recall、hard-negative、answer EM/F1/数值容差、bootstrap(seed=0, n=1000) 与 Wilson CI、language/answer_type/tag/document 四维切片（`eval_metrics.py`）；报告 `work/eval_reports/public_nist_report.json`（数字见 `docs/BENCHMARK_CARD.md`） |
 | 确定性 | 🆕 | 同输入重复运行两次，报告（去除 `created_at` 后）字节一致——运行时自检并在报告 `determinism.verified=true`（`public_runner.cmd_run`）；2026-08-12 宿主复跑确认指标字节一致 |
 | API + UI | 🆕 | `POST /evaluation/run` 默认 `public_nist`（未 prepare 返回 409 并提示脚本）；`synthetic_smoke`（旧 22 条）保留；前端 `Evaluation.tsx` 双 profile 选择 + `EvaluationReport.tsx` |
-| 真实模型评测 | 🆕 | `real_full_runner.py` 三变体消融（2026-08-21，`work/real_full_report.json`）：bge-m3 / bge-reranker-v2-m3 / LLM 全真实加载运行，recall@5 0.9375 / MRR 0.9062 / answer EM 0.333（BENCHMARK_CARD §12）；评测语料沿用 pypdf 与 mock 基线同源可比（Docling 解析单独 VERIFIED，见 VALIDATION §4）；生产运行时默认 mock 离线开箱即用 |
+| 真实模型评测 | 🆕 | `real_full_runner.py` 四变体消融（2026-08-21，`work/real_full_report.json` + `real_full_lexical.json`）：bge-m3 / bge-reranker-v2-m3 / LLM 全真实加载运行，recall@5 0.9375 / MRR 0.9062 / answer EM 0.333（BENCHMARK_CARD §12）；词法 vs 神经重排同口径对比完成：词法零增益、神经 MRR +0.154；评测语料沿用 pypdf 与 mock 基线同源可比（Docling 解析单独 VERIFIED，见 VALIDATION §4）；生产运行时默认 mock 离线开箱即用 |
 | 评测历史对比 / 回归门禁 | ⬜ | 报告按次落库（`evaluations` 表）可查历史，但无跨报告 diff 与自动回归门禁。**❓ 需要产品决策**：是否引入 CI 评测门禁 |
 
 ## 9. 延迟 / 取消 / 重试

@@ -1,6 +1,7 @@
 """真实模型全链路评测：bge-m3 + bge-reranker-v2-m3 + 真实 LLM。
 
-三路变体：bm25_real_llm / hybrid_real_llm / hybrid_rerank_llm。
+四路变体：bm25_real_llm / hybrid_real_llm / hybrid_lexical_llm / hybrid_rerank_llm。
+词法重排统一用 baselines.LexicalReranker（与生产 mock 重排同实现，保证口径一致）。
 """
 from __future__ import annotations
 
@@ -94,23 +95,6 @@ class RealReranker:
         pairs = [(query, p) for p in passages]
         raw_scores = self._model.predict(pairs, show_progress_bar=False)
         scored = list(zip(candidates, [float(s) for s in raw_scores]))
-        scored.sort(key=lambda x: -x[1])
-        return [c for c, _ in scored[:k]]
-
-
-class LexicalReranker:
-    def __init__(self, corpus: list[dict]) -> None:
-        self.corpus = corpus
-
-    def rerank(self, query: str, candidates: list[dict], k: int) -> list[dict]:
-        q_tokens = set(query.lower().split())
-        scored = []
-        for c in candidates:
-            text = self.corpus[c["chunk_index"]]["text"].lower()
-            p_tokens = set(text.split())
-            inter = len(q_tokens & p_tokens)
-            union = len(q_tokens | p_tokens)
-            scored.append((c, inter / union if union else 0.0))
         scored.sort(key=lambda x: -x[1])
         return [c for c, _ in scored[:k]]
 
@@ -233,7 +217,7 @@ def main():
     print(f"LLM: {backend}")
 
     # 预加载真实模型
-    from app.evaluation.baselines import BM25Retriever
+    from app.evaluation.baselines import BM25Retriever, LexicalReranker
 
     print("\n=== 加载真实模型 ===")
     bm25 = BM25Retriever(corpus)
@@ -248,6 +232,11 @@ def main():
             "RRF(BM25 + bge-m3) + 无重排 + 真实 LLM",
             type("R", (), {"search": lambda self, q, k: rrf_fuse(bm25, real_dense, corpus, q, k)})(),
             identity,
+        ),
+        "hybrid_lexical_llm": (
+            "RRF(BM25 + bge-m3) + 词法重排 + 真实 LLM",
+            type("R", (), {"search": lambda self, q, k: rrf_fuse(bm25, real_dense, corpus, q, k)})(),
+            lexical,
         ),
         "hybrid_rerank_llm": (
             "RRF(BM25 + bge-m3) + bge-reranker + 真实 LLM",

@@ -54,11 +54,12 @@ npm run lint                             # eslint（本次实测零告警）
 
 ```bash
 # 前置：requirements-ml.txt 已装；设置页/runtime_config 已配好可用 LLM；HF 权重已缓存（bge-m3 + bge-reranker-v2-m3）
-./.venv/bin/python -m app.evaluation.real_full_runner                     # 三变体全跑（约 25 分钟，CPU）
+./.venv/bin/python -m app.evaluation.real_full_runner                     # 四变体全跑（约 30 分钟，CPU）
 ./.venv/bin/python -m app.evaluation.real_full_runner --variants hybrid_rerank_llm --out real_full_rerank.json
+./.venv/bin/python -m app.evaluation.real_full_runner --variants bm25_real_llm hybrid_lexical_llm --out real_full_lexical.json
 ```
 
-产物 `work/real_full_report.json`（含 `real_full_{bm25,hybrid,rerank}.json` 单变体复跑）。检索类指标确定性可复现；answer 类指标受 LLM 采样影响（±0.07 内波动）。预期值与边界见 `docs/BENCHMARK_CARD.md` §12。
+产物 `work/real_full_report.json`（含 `real_full_{bm25,hybrid,rerank,lexical}.json` 单变体/分组复跑）。检索类指标确定性可复现；answer 类指标受 LLM 采样影响（±0.07 内波动）。预期值与边界见 `docs/BENCHMARK_CARD.md` §12。
 
 ## 3. 预期输出（expected outputs，2026-08-12 复跑核对）
 

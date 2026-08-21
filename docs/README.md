@@ -48,7 +48,7 @@
 | 无答案 | SSE `no_answer` 事件（`no_evidence`=检索无有效信号不调 LLM；`not_supported`=有证据但生成无有效引用，delta 绝不提前泄出）；空知识库 /chat 409 |
 | 反馈与追踪 | `POST /feedback`（rating + issue_type + 评论）、`GET /trace/{id}`（ACL 过滤；query 原文与可反查哈希不落库） |
 | 评测集 | 默认 `public_nist`：2 份 NIST PDF / 103 chunk / **18 题**（16 answerable + 2 unanswerable，含 2 条中文跨语言题，gold 为自建页码证据，非 NIST 官方 benchmark）；`synthetic_smoke`：旧 2 篇内嵌文档 / 12 页 / **22 条**中英问答 |
-| 评测指标 | 检索 Recall/Precision/Hit@K + hard_negative_recall@K、MRR、nDCG@K、citation page precision/recall + hard_negative_citation_rate、answer EM/F1（exact/set/rubric/numeric 容差/unanswerable 弃答判分）、bootstrap(seed=0) + Wilson CI、language/answer_type/tag/document 切片、provenance（真实模型适配器 VERIFIED/NOT_RUN）、报告确定性自检（见 `docs/BENCHMARK_CARD.md`）；真实模型三变体消融收录于 BENCHMARK_CARD §12（`real_full_runner.py`，recall@5 0.9375 / MRR 0.9062 / answer EM 0.333） |
+| 评测指标 | 检索 Recall/Precision/Hit@K + hard_negative_recall@K、MRR、nDCG@K、citation page precision/recall + hard_negative_citation_rate、answer EM/F1（exact/set/rubric/numeric 容差/unanswerable 弃答判分）、bootstrap(seed=0) + Wilson CI、language/answer_type/tag/document 切片、provenance（真实模型适配器 VERIFIED/NOT_RUN）、报告确定性自检（见 `docs/BENCHMARK_CARD.md`）；真实模型四变体消融收录于 BENCHMARK_CARD §12（`real_full_runner.py`，recall@5 0.9375 / MRR 0.9062 / answer EM 0.333；词法重排零增益、神经重排 MRR +0.154） |
 | 指标端点 | 6 计数器（document_uploads_total / documents_indexed_total / documents_failed_total / queries_total / citations_returned_total / errors_total）+ 4 直方图（http_request_latency_ms / pipeline_latency_ms / retrieve_latency_ms / llm_latency_ms，含 p50/p95/max） |
 | 设计 Token | accent `#3E63DD` / citation `#F5B544`；dark 默认 + light 双主题（`data-theme`）；禁 emoji / 紫粉渐变 / 硬编码色 |
 | 缓存 | `RAG_CACHE_TTL`（默认 300 秒，hybrid_retrieve 结果缓存 TTL；0=禁用）；reindex / 文档删除 / 索引成功时自动失效 |
@@ -118,6 +118,7 @@
 | 19 | 2026-08-21 real run provenance 裁决 | `work/public_nist_real_run.json` 的 `reranker_bge: RUN` 与 AGENTS.md 已知薄弱点（bge-reranker 仍为 mock 降级）矛盾；`docling: NOT_RUN` 与 pipeline.name 中 "Docling" 描述不符 | BENCHMARK_CARD 新增 §11 收录 real run 数据并标注 provenance 矛盾；README 简历卡片引用区间值 "recall@5 0.84–0.94" 并标注口径 |
 | 20 | 2026-08-21 citation 事件新增检索分数 | citation 事件不含 rrf/faiss/fts 分数，前端无法展示检索融合过程 | citation_service.py 新增 rrfScore/faissScore/ftsScore 字段；CitationPayload/Citation 类型同步；CitationChip tooltip 展示分数 |
 | 21 | 2026-08-21 真实模型消融评测收录 | BENCHMARK_CARD §11 real run 归因缺口（embedding vs reranker 贡献不可分）与 AGENTS 薄弱点「bge-reranker 真实权重未测」悬置 | 新增 `real_full_runner.py` 三变体消融（bm25 / hybrid / hybrid+reranker，bge-m3+bge-reranker+真实 LLM 全真实），BENCHMARK_CARD §12 正式收录（recall@5 0.9375 / MRR 0.9062，重排增量 MRR +0.154）；测试数 79→107（新增 test_cache/test_citation 共 28 项）；AGENTS / VALIDATION / MATURITY_MATRIX / REPRODUCE 同步；`work/eval_reports/public_nist_report.json` 于 WSL 复跑再生成（指标与原报告一致） |
+| 22 | 2026-08-21 词法 vs 神经重排同口径对比 | §12.4 遗留「词法/神经重排相对优劣」未验证；发现初版 bm25_real_llm 误用 Jaccard 词法重排（口径 bug） | runner 词法重排统一为 `baselines.LexicalReranker`（与生产 mock 同实现），新增 hybrid_lexical_llm 变体并重跑 bm25；结论（BENCHMARK_CARD §12.3）：词法重排在 hybrid 池零增益（MRR 持平 0.752），神经重排 MRR +0.154；bm25 口径修正后与 mock 基线 MRR 0.7469 完全一致（检索确定性跨模型验证） |
 
 ## 6. 文档维护规则（防止再次漂移）
 
