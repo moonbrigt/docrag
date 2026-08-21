@@ -1,6 +1,6 @@
 # DocRAG Benchmark Card（public_nist v1）
 
-> 本次文档更新，数据核对日期 2026-08-12。本文所有数字唯一权威来源：`work/eval_reports/public_nist_report.json`（created_at `2026-08-12T04:02:43+00:00`）；口径定义与代码 `backend/app/evaluation/eval_metrics.py`、`baselines.py`、`public_runner.py` 核对一致。2026-08-12 宿主复跑确认：除 `created_at` 与路径字段外指标字节一致（确定性验证）。
+> 本次文档更新，数据核对日期 2026-08-21。§3–§11 数字唯一权威来源：`work/eval_reports/public_nist_report.json`（2026-08-21 于 WSL 复跑再生成，指标与 2026-08-12 原报告一致，`determinism.verified=true`）；§12 数字唯一权威来源：`work/real_full_report.json`（created_at `2026-08-21T07:00:09`）及三次单变体复跑 `work/real_full_{bm25,hybrid,rerank}.json`。口径定义与代码 `backend/app/evaluation/eval_metrics.py`、`baselines.py`、`public_runner.py`、`real_full_runner.py` 核对一致。
 
 ## 1. 任务定义
 
@@ -162,7 +162,7 @@ per_query 关键记录：18 题中唯一 `answer_correct=1.0` 的是 nist-012（
 | bge-reranker-v2-m3 | NOT_RUN | 同上 |
 | LLM | NOT_RUN | 无密钥/成本/外传授权，按任务约束不读取密钥、不调用付费 API |
 
-**本文档 §3–§9 全部数字 = 无密钥工程基线（bm25 + 词法重排 + 抽取式答案）的结果，不代表真实模型链路性能。**
+**本文档 §3–§9 全部数字 = 无密钥工程基线（bm25 + 词法重排 + 抽取式答案）的结果，不代表真实模型链路性能；真实模型链路结果见 §12。**
 
 ## 11. 真实模型链路 Run（2026-08-20，未收录为正式基线）
 
@@ -207,4 +207,44 @@ per_query 关键记录：18 题中唯一 `answer_correct=1.0` 的是 nist-012（
 3. **无消融对比**：该 run 未跑 BM25 / dense_mock / hybrid 变体，无法归因各组件贡献
 4. **determinism 未验证**：该 run 未做同输入重复运行字节一致性自检
 
-**结论**：真实嵌入 + 真实 LLM 的检索质量（recall@5 0.9375）显著优于 mock 基线（0.8438），但具体归因（embedding vs reranker vs LLM）需补跑消融实验。简历可引用区间值 "recall@5 0.84–0.94" 并标注口径。
+**结论**：真实嵌入 + 真实 LLM 的检索质量（recall@5 0.9375）显著优于 mock 基线（0.8438）；归因消融已于 2026-08-21 补跑完成（真实 bge-m3 + 真实 bge-reranker + 真实 LLM 三变体，provenance 无矛盾），见 §12。简历可引用区间值 "recall@5 0.84–0.94" 并标注口径。
+
+## 12. 真实模型全链路消融（2026-08-21，正式收录）
+
+运行入口 `backend/app/evaluation/real_full_runner.py`（WSL 实测）。主报告 `work/real_full_report.json`（三变体同进程跑完）；另各变体单独复跑一次（`work/real_full_{bm25,hybrid,rerank}.json`）作可复现性核验。
+
+### 12.1 Provenance（无矛盾）
+
+| 适配器 | 状态 | 说明 |
+|--------|------|------|
+| 语料/解析 | 与 mock 基线同源 | `work/eval_corpus.json`（pypdf 每页 1 chunk）；三变体共用同一语料，差异仅在检索/重排/生成，归因干净 |
+| bge-m3 embedding | RUN（真实） | FlagEmbedding 本地权重 `BAAI/bge-m3`，dense 1024 维；103 chunk 编制约 220s |
+| bge-reranker-v2-m3 | RUN（真实） | sentence-transformers CrossEncoder（CPU），加载约 9s，逐对打分 top-15→top-5 |
+| LLM | RUN（真实） | OpenAI 兼容云端端点（运行时配置；密钥经设置页/env 注入，报告不含密钥） |
+
+与 §11（2026-08-20 run）的区别：本轮 reranker 为真实 CrossEncoder 加载运行，provenance 与事实一致。
+
+### 12.2 三变体结果（同一 18 题、同一指标口径）
+
+| 变体 | recall@1 | recall@5 | hit@1 | MRR | nDCG@5 | citation_recall | answer EM | answer F1 | unanswerable | wall |
+|------|---------|---------|-------|-----|--------|----------------|-----------|-----------|--------------|------|
+| bm25_real_llm | 0.2812 | 0.5312 | 0.3125 | 0.4062 | 0.4215 | 0.4062 | 0.25 | 0.4028 | 1.0 | 224s |
+| hybrid_real_llm | 0.6250 | 0.8750 | 0.6875 | 0.7521 | 0.7730 | 0.8125 | 0.2143 | 0.2851 | 1.0 | 219s |
+| hybrid_rerank_llm | **0.8125** | **0.9375** | **0.8750** | **0.9062** | **0.9051** | **0.8750** | 0.3333 | 0.4501 | 1.0 | 1044s |
+
+对比无密钥基线（§3）：recall@5 0.844→0.938，MRR 0.747→0.906，answer EM 0.063→0.333，unanswerable_correct 0→1.0。
+
+### 12.3 消融归因（§6.1 / §11.4 遗留问题闭环）
+
+1. **真实 bge-m3 的价值**：hybrid（无重排）recall@5 0.875，远超 mock 稠密单路 0.594（§6.1）且超过纯 BM25 的 0.531——混合检索的价值在真实嵌入下成立，§6.1「mock 结论不可推广」的保留条款就此解除。
+2. **重排贡献可分离**（§11.4 缺口闭环）：hybrid → + 真实 reranker，MRR +0.154（0.752→0.906）、recall@1 +0.19（0.625→0.812）、hit@1 +0.19（0.688→0.875）。§11 run 的提升不再有「来自 embedding 还是 reranker」的归因疑问。
+3. **LLM 生成 vs 抽取式**（对照 §3）：answer EM 0.063→0.333、F1 0.070→0.450；弃答 0→1.0（LLM 判断 + no-answer 机制共同作用）。
+4. **成本**：rerank 变体 wall 时间 ×4.7（CPU CrossEncoder 逐对打分），无 GPU 时重排是主要延迟来源。
+
+### 12.4 边界（勿超读）
+
+- **answer 指标受 LLM 采样影响**：单变体复跑与主报告的 EM/F1 有波动（如 rerank 变体 EM 0.333↔0.267）；检索/引用类指标四次运行完全一致——检索链路确定性成立，生成链路不承诺字节级可复现。
+- **「真实重排 vs 词法重排」未做同口径对比**：本消融的 reranker 增量结论仅相对「无重排」成立；§11 生产管线 run（词法重排）达到过相近检索指标（recall@1 0.8125），词法/神经重排的相对优劣是后续验证项。
+- 18 题 / 103 chunk 样本量小，CI 宽（见 §7），结论仅对该语料成立。
+- 语料为 pypdf 按页抽取，非 Docling 结构化分块——解析质量不在本消融范围内（Docling 真实解析单独 VERIFIED，见 VALIDATION §4）。
+- LLM 具体型号以运行时配置为准，answer 类指标不可跨 LLM 配置直接对比。

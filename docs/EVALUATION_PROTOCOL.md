@@ -109,3 +109,4 @@ bash ../scripts/evaluation/run.sh
 | 报告 | `work/eval_reports/public_nist_report.json` | profile/manifest/corpus/baseline/metrics/ci/slices/per_query/provenance/created_at/determinism |
 | 历史 | `evaluations` 表（SQLite） | 每次 API 评测的 config_json + metrics_json |
 | 分析 | `work/analysis/NIST.AI.*.pages.json` | 制卡期人工核对用的按页文本转储（非评测产物） |
+| 真实消融 | `work/real_full_report.json`（+ `real_full_{bm25,hybrid,rerank}.json` 单变体复跑） | `real_full_runner.py` 三变体（bm25 / hybrid / hybrid+reranker，全真实模型）；检索指标确定性可复现，answer 指标受 LLM 采样影响（BENCHMARK_CARD §12） |

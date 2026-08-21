@@ -1,18 +1,20 @@
 # DocRAG 验证记录（Validation）
 
-> 数据核对日期 2026-08-20（WSL 迁移后复核）。本文件记录运行环境的验证实测：后端全量测试、评测确定性、前端构建与真实模型链路。环境唯一为 **WSL（Ubuntu）原生**；Docker 已弃用并移除。
+> 数据核对日期 2026-08-21（WSL 迁移后复核）。本文件记录运行环境的验证实测：后端全量测试、评测确定性、前端构建与真实模型链路。环境唯一为 **WSL（Ubuntu）原生**；Docker 已弃用并移除。
 
 ## 1. 验证对象与日期
 
 - 验证基线：`moonbrigt/docrag` 分支 main（基线 `64414d7`）+ 本轮未提交的成熟度改动（ACL/生命周期/版本/no-answer/反馈/trace/评测）。
 - 宿主复核执行于 2026-08-12：Python 3.12.3（评测 venv）、node v24.19.0、pytest 9.1.1、fastapi 0.115.13、pypdf 6.15.0、faiss-cpu 1.14.3、numpy 2.5.2。
 
-## 2. 测试文件清单与覆盖点（backend/app/tests/，13 文件 / 79 用例节点）
+## 2. 测试文件清单与覆盖点（backend/app/tests/，15 文件 / 107 用例节点）
 
 | 文件 | 用例数 | 覆盖点 |
 |------|--------|--------|
 | test_documents.py | 5 | 上传→indexed 全流程、列表空态、详情 404、原文文件服务与删除、缺文件 404 |
 | test_health.py | 2 | /health 健康状态、/config/backends 后端就绪 |
+| test_cache.py | 9 | 查询缓存 TTL/命中/失效（reindex、删除、索引成功时清除）、禁用开关 |
+| test_citation.py | 19 | citation 分数透传、引用缓冲校验、引用页过滤与 no_answer 联动 |
 | test_maturity_acl.py | 9 | ACL 端点权限、撤权 fail-closed（立即 404）、admin 绕过可见性、CORS 不含 X-Rag-*、检索双路范围限定、文档列表契约字段、显式空范围零结果、本地模式忽略身份头、trusted-proxy 租户隔离 |
 | test_maturity_chat.py | 7 | 空库 409、no_evidence 不调用 LLM、not_supported（有证据无引用不泄出 delta）、rerank fail-closed、SSE 全流程契约、trace 访问控制、query 原文不落库 |
 | test_maturity_lifecycle.py | 6 | cancel 中途停止并清理、cancel 终态冲突 409、失败→retry 清理 partial、retry 需管理权限、warning 保留 partial、重启恢复（瞬态→failed） |
@@ -27,12 +29,12 @@
 
 ## 3. 实测结果
 
-### 3.1 后端全量 pytest：✅ 79 passed（2026-08-20 WSL 复核）
+### 3.1 后端全量 pytest：✅ 107 passed（2026-08-21 WSL 复核）
 
 | 项 | 结果 |
 |----|------|
-| 本次复核（backend venv，`./.venv/bin/python -m pytest -q`） | **79 passed in ~7.6s**，零失败零跳过（在 WSL 实测确认） |
-| 覆盖 | 13 文件 / 79 用例节点，含 4 个成熟度测试文件（acl/chat/lifecycle/versions）、公开评测测试、runtime_config / embed_http / accelerator / public_real |
+| 本次复核（backend venv，`./.venv/bin/python -m pytest -q`） | **107 passed in ~10.8s**，零失败零跳过（在 WSL 实测确认） |
+| 覆盖 | 15 文件 / 107 用例节点，含 4 个成熟度测试文件（acl/chat/lifecycle/versions）、公开评测测试、cache / citation、runtime_config / embed_http / accelerator / public_real |
 | 修复记录 | 此前发现在 `backend/app/db.py` 上 `_migrate` 先于建表执行会让全新数据库报 `no such table: documents`（当时 23 passed / 38 errors）；修复为 `_migrate` 增加 `sqlite_master` 存在性守卫（表不存在即跳过 ALTER，全新库交 SCHEMA 建表）——新库（pytest 临时库）与既有库双路径回归均通过 |
 
 ### 3.2 评测专项（独立于 3.1 的 db 初始化，可复现）
@@ -49,11 +51,11 @@
 |----|------|
 | `npm run build`（tsc --noEmit && vite build） | ✅ 通过（vite 8.2.1，1965 modules，built in 450ms） |
 | `npm run lint`（eslint .） | ✅ 零告警 |
-| `ruff check backend`（默认规则集） | ⚠️ 73 条提示：含 **2 条 F401 未用导入**（`tests/test_maturity_acl.py:9` `json`、`tests/test_maturity_versions.py:9` `asyncio`，均可 `--fix`），其余为基线存量风格类（UP045×25、B008×17、BLE001×13、I001×9 等，非本轮引入的功能问题）；默认规则集不含 E501，另行启用行宽检查时 96 条；未配置 ruff 规则文件，无「零警告」基线可对标 |
+| `ruff check backend`（默认规则集） | ⚠️ 94 条提示（2026-08-21 复测，F401 已清零）：UP045×37、BLE001×18、B008×17、I001×13 及 8 条单发，均为存量风格类非功能问题；未配置 ruff 规则文件，无「零警告」基线可对标 |
 
 ## 4. 真实模型链路验收（WSL 实测）
 
-> WSL 迁移后，真实 Docling 解析与检索链路已在 WSL 原生实测（2026-08-20）；容器与 Docker 已移除。
+> WSL 迁移后，真实 Docling 解析与检索链路已在 WSL 原生实测（2026-08-20）；真实模型全链路消融评测已于 2026-08-21 补跑（见 §4 末条）。容器与 Docker 已移除。
 
 **执行环境**：WSL（Ubuntu），`RAG_PARSE_MOCK=false`（docling 真实解析）；embedding/rerank/LLM 按设置页运行时配置。
 
@@ -61,13 +63,14 @@
 - 三篇语料（AI-Agents-in-Depth-zh-CN / NIST.AI.100-1 / NIST.AI.600-1）Docling 重解析并重建索引，共 **583 块**，page_no / bbox / section 溯源字段验证
 - 真实语料检索：query "risk management framework" 命中 page 3/26/44 等真实相关页
 - chat SSE 全链路（stage/delta/citation/done）：引用页码 3/44/26/7/9 均为 AI RMF 相关章节，citation 含真实 bbox 与 snippet
-- 结论：**Docling 真实解析 = VERIFIED**（CPU，48 页 + TableFormer 首次含模型下载约 506MB，全流程约 8 分钟）；bge-m3 嵌入与对话分别走 Ollama 本地模型已验证；bge-reranker-v2-m3 仍为 mock 降级（真实重排与 HF 权重加载按 AGENTS.md 列为已知薄弱点），LLM 真实权重待最终核对
+- 结论：**Docling 真实解析 = VERIFIED**（CPU，48 页 + TableFormer 首次含模型下载约 506MB，全流程约 8 分钟）；bge-m3 嵌入与对话分别走 Ollama 本地模型已验证；bge-reranker-v2-m3 真实 CrossEncoder 已于 2026-08-21 在消融评测中加载验证（见下条）
+- 真实模型全链路消融（2026-08-21，`backend/app/evaluation/real_full_runner.py`）：bge-m3（FlagEmbedding 本地权重）+ bge-reranker-v2-m3（CrossEncoder，CPU）+ 真实云端 LLM 三变体消融，18 题全跑通；hybrid_rerank_llm recall@5 0.9375 / MRR 0.9062 / answer EM 0.333 / unanswerable 1.0；检索指标跨 4 次运行一致（确定性成立），报告 `work/real_full_report.json`（数字与边界见 BENCHMARK_CARD §12）
 
 ## 5. 已知问题清单（2026-08-20 核对）
 
 | # | 问题 | 状态 | 证据 |
 |---|------|------|------|
 | 1 | `backend/app/db.py` 迁移顺序回归（`_migrate` 先于建表） | ✅ 已修复：`_migrate` 增加 `sqlite_master` 存在性守卫，新库跳过 ALTER；79 passed，新库/既有库双路径验证通过 | §3.1 修复记录 |
-| 2 | 新代码 2 处 F401 未用导入 | ⬜ 未修（ruff 提示，可安全删除） | `test_maturity_acl.py:9`（json）、`test_maturity_versions.py:9`（asyncio） |
+| 2 | 新代码 2 处 F401 未用导入 | ✅ 已修复：删除 `test_maturity_acl.py`（json）与 `test_maturity_versions.py`（asyncio）未用导入，107 passed | ruff F401 清零 |
 
-> 本文件验证在 WSL 实测（2026-08-20）；后续任何代码改动需重跑 §3 全量检查并同步更新本文件。
+> 本文件验证在 WSL 实测（最近 2026-08-21）；后续任何代码改动需重跑 §3 全量检查并同步更新本文件。

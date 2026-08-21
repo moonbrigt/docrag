@@ -34,7 +34,7 @@ bash ../scripts/evaluation/run.sh
 ./.venv/bin/python -m app.evaluation.public_runner --work-dir ../work verify
 
 # 5) 测试
-./.venv/bin/python -m pytest -q          # 全量（79 passed）
+./.venv/bin/python -m pytest -q          # 全量（107 passed）
 ./.venv/bin/python -m pytest -q app/tests/test_public_evaluation.py   # 评测专项
 
 # 前端（另开终端）
@@ -49,6 +49,16 @@ npm run lint                             # eslint（本次实测零告警）
 | PDF 缓存 | `work/source_cache/{NIST.AI.100-1,NIST.AI.600-1}.pdf` |
 | 语料 | `work/eval_corpus.json`（JSONL，103 chunk） |
 | 评测报告 | `work/eval_reports/public_nist_report.json` |
+
+## 2.1 真实模型消融复现（可选，需权重与 LLM 配置）
+
+```bash
+# 前置：requirements-ml.txt 已装；设置页/runtime_config 已配好可用 LLM；HF 权重已缓存（bge-m3 + bge-reranker-v2-m3）
+./.venv/bin/python -m app.evaluation.real_full_runner                     # 三变体全跑（约 25 分钟，CPU）
+./.venv/bin/python -m app.evaluation.real_full_runner --variants hybrid_rerank_llm --out real_full_rerank.json
+```
+
+产物 `work/real_full_report.json`（含 `real_full_{bm25,hybrid,rerank}.json` 单变体复跑）。检索类指标确定性可复现；answer 类指标受 LLM 采样影响（±0.07 内波动）。预期值与边界见 `docs/BENCHMARK_CARD.md` §12。
 
 ## 3. 预期输出（expected outputs，2026-08-12 复跑核对）
 

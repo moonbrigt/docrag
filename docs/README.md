@@ -16,7 +16,7 @@
 | 设计 | `frontend/src/design/`（DESIGN.md / design-tokens.json / component-states.md / wireframes.md）+ `frontend/src/styles/tokens.css` | 设计系统权威版（早期 web 稿已移除） | 设计变更时；**token 以 design-tokens.json 为源** |
 | 实现 | 本文档 `docs/README.md` + 源码 | 速查表、裁决记录、维护规则 | **每次改代码必同步** |
 | 部署 | `docs/DEPLOYMENT.md` | WSL 原生部署、真实模型切换、env 一览、故障排查 | 部署/配置变更时 |
-| 测试 | `backend/app/tests/`（smoke + 成熟度 + 评测，79 项） | 接口冒烟、ACL/生命周期/版本/chat 契约与检索质量断言 | 每次改代码必跑 `pytest -q` |
+| 测试 | `backend/app/tests/`（smoke + 成熟度 + 评测 + cache/citation，107 项） | 接口冒烟、ACL/生命周期/版本/chat 契约、检索质量与缓存/引用断言 | 每次改代码必跑 `pytest -q` |
 | 工程说明 | `docs/ENGINEERING.md` | 关键决策、技术权衡、验证状态与已知边界 | 架构或验证状态变化时 |
 | 成熟度审计 | `docs/MATURITY_MATRIX.md` | 10 维度成熟度矩阵（✅/🆕/⬜/❓）+ 市场基线对照 | 功能/权限/状态机变化时 |
 | 数据卡 | `docs/DATA_CARD.md` | 评测数据集来源、许可、页码映射、gold 结构与声明 | 数据集变更时 |
@@ -25,7 +25,7 @@
 | 复现指南 | `docs/REPRODUCE.md` | 本地复现路径、预期输出（expected vs observed） | 命令或产物变化时 |
 | 验证记录 | `docs/VALIDATION.md` | 本地验证实测数据、已知问题 | 每次验证后 |
 
-## 2. 关键事实速查（与源码核对过的当前值，2026-08-20 复核）
+## 2. 关键事实速查（与源码核对过的当前值，2026-08-21 复核）
 
 | 项 | 当前值 |
 |----|--------|
@@ -48,7 +48,7 @@
 | 无答案 | SSE `no_answer` 事件（`no_evidence`=检索无有效信号不调 LLM；`not_supported`=有证据但生成无有效引用，delta 绝不提前泄出）；空知识库 /chat 409 |
 | 反馈与追踪 | `POST /feedback`（rating + issue_type + 评论）、`GET /trace/{id}`（ACL 过滤；query 原文与可反查哈希不落库） |
 | 评测集 | 默认 `public_nist`：2 份 NIST PDF / 103 chunk / **18 题**（16 answerable + 2 unanswerable，含 2 条中文跨语言题，gold 为自建页码证据，非 NIST 官方 benchmark）；`synthetic_smoke`：旧 2 篇内嵌文档 / 12 页 / **22 条**中英问答 |
-| 评测指标 | 检索 Recall/Precision/Hit@K + hard_negative_recall@K、MRR、nDCG@K、citation page precision/recall + hard_negative_citation_rate、answer EM/F1（exact/set/rubric/numeric 容差/unanswerable 弃答判分）、bootstrap(seed=0) + Wilson CI、language/answer_type/tag/document 切片、provenance（真实模型适配器 VERIFIED/NOT_RUN）、报告确定性自检（见 `docs/BENCHMARK_CARD.md`） |
+| 评测指标 | 检索 Recall/Precision/Hit@K + hard_negative_recall@K、MRR、nDCG@K、citation page precision/recall + hard_negative_citation_rate、answer EM/F1（exact/set/rubric/numeric 容差/unanswerable 弃答判分）、bootstrap(seed=0) + Wilson CI、language/answer_type/tag/document 切片、provenance（真实模型适配器 VERIFIED/NOT_RUN）、报告确定性自检（见 `docs/BENCHMARK_CARD.md`）；真实模型三变体消融收录于 BENCHMARK_CARD §12（`real_full_runner.py`，recall@5 0.9375 / MRR 0.9062 / answer EM 0.333） |
 | 指标端点 | 6 计数器（document_uploads_total / documents_indexed_total / documents_failed_total / queries_total / citations_returned_total / errors_total）+ 4 直方图（http_request_latency_ms / pipeline_latency_ms / retrieve_latency_ms / llm_latency_ms，含 p50/p95/max） |
 | 设计 Token | accent `#3E63DD` / citation `#F5B544`；dark 默认 + light 双主题（`data-theme`）；禁 emoji / 紫粉渐变 / 硬编码色 |
 | 缓存 | `RAG_CACHE_TTL`（默认 300 秒，hybrid_retrieve 结果缓存 TTL；0=禁用）；reindex / 文档删除 / 索引成功时自动失效 |
@@ -117,6 +117,7 @@
 | 18 | 2026-08-20 WSL 迁移后文档对齐 | 文档仍以 Docker compose 为部署主路径、端点数为 11/19、目录结构与模型后端未反映 runtime_config 重构，且引用了不存在的 `PRD-文档RAG应用.md`/顶层 `web/`/`phase1-tech-research.md` | 统一为 WSL 原生部署并 delete Docker 遗留（compose/Dockerfile/nginx.conf/scripts-docker/manage.sh）；端点数=22（补 `POST /config/reindex`）；速查表补模型后端三档（mock/http/docling/pdf）与 `runtime_config` 表；目录树、测试数（79）对齐源码 |
 | 19 | 2026-08-21 real run provenance 裁决 | `work/public_nist_real_run.json` 的 `reranker_bge: RUN` 与 AGENTS.md 已知薄弱点（bge-reranker 仍为 mock 降级）矛盾；`docling: NOT_RUN` 与 pipeline.name 中 "Docling" 描述不符 | BENCHMARK_CARD 新增 §11 收录 real run 数据并标注 provenance 矛盾；README 简历卡片引用区间值 "recall@5 0.84–0.94" 并标注口径 |
 | 20 | 2026-08-21 citation 事件新增检索分数 | citation 事件不含 rrf/faiss/fts 分数，前端无法展示检索融合过程 | citation_service.py 新增 rrfScore/faissScore/ftsScore 字段；CitationPayload/Citation 类型同步；CitationChip tooltip 展示分数 |
+| 21 | 2026-08-21 真实模型消融评测收录 | BENCHMARK_CARD §11 real run 归因缺口（embedding vs reranker 贡献不可分）与 AGENTS 薄弱点「bge-reranker 真实权重未测」悬置 | 新增 `real_full_runner.py` 三变体消融（bm25 / hybrid / hybrid+reranker，bge-m3+bge-reranker+真实 LLM 全真实），BENCHMARK_CARD §12 正式收录（recall@5 0.9375 / MRR 0.9062，重排增量 MRR +0.154）；测试数 79→107（新增 test_cache/test_citation 共 28 项）；AGENTS / VALIDATION / MATURITY_MATRIX / REPRODUCE 同步；`work/eval_reports/public_nist_report.json` 于 WSL 复跑再生成（指标与原报告一致） |
 
 ## 6. 文档维护规则（防止再次漂移）
 
@@ -142,10 +143,10 @@ docrag/
 │   │   ├── repositories/      # document_repo / chunk_repo / trace_repo（数据访问）
 │   │   ├── services/          # pipeline / document / index / retrieve / rerank / generate / citation / trace
 │   │   ├── routes/            # documents / chat / search / meta / config / trace / evaluation（全部 /api/v1）
-│   │   └── evaluation/        # public_runner / public_dataset / eval_metrics / baselines / ablation + datasets/（含 22 条 synthetic dataset.json）
+│   │   └── evaluation/        # public_runner / real_full_runner / real_llm_runner / public_dataset / eval_metrics / baselines / ablation + datasets/（含 22 条 synthetic dataset.json）
 │   ├── requirements*.txt      # 轻量运行时 / 真实模型 / 开发测试 / 评测 四档依赖
 │   ├── start_mock.sh          # 一键离线 MOCK 启动（env 全 mock + uvicorn）
-│   └── tests/                 # smoke（health/documents）+ 成熟度 + 评测（79 项）
+│   └── tests/                 # smoke（health/documents）+ 成熟度 + 评测 + cache/citation（107 项）
 ├── frontend/
 │   ├── src/
 │   │   ├── pages/             # Home / Documents / Chat / Evaluation / Settings（Spec §7 页面清单）

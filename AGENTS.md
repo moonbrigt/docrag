@@ -82,10 +82,10 @@ docrag/                        # 仓库根（WSL: /home/z1050/Projects/docrag）
 
 ## 已知薄弱点（修 bug 优先清单）
 
-- 真实模型链路：Docling 真实解析已在 WSL 实测通过（三篇 PDF → HybridChunker 结构化分块，page_no/bbox/section 溯源已验证）；bge-m3 嵌入与对话分别走 Ollama 本地模型已验证；bge-reranker-v2-m3 仍为 mock 降级，真实重排与 HF 权重加载未测
+- 真实模型链路：Docling 真实解析、bge-m3 嵌入、真实 LLM 均已在 WSL 实测通过；bge-reranker-v2-m3 真实 CrossEncoder 已在 2026-08-21 真实模型消融评测中加载并验证（MRR 0.752→0.906，见 BENCHMARK_CARD §12）——但生产 runtime_config 当前仍配置为 mock 重排（CPU 下 wall ×4.7 的延迟代价），词法 vs 神经重排同口径对比是遗留验证项
 - 前端无自动化测试（可补 vitest + testing-library，优先覆盖 CitationChip 引用跳转与 SSE 解析）
 - 后端测试只覆盖 smoke（health/documents）与评测；`chat` SSE 流、删除同步、双后端切换无专门测试
-- 评测 MRR 0.52（Mock 下）偏低——真实模型下需复核；Recall/HitRate 已 1.0
+- 评测指标已闭环：mock 基线 MRR 0.7469；真实全链路（bge-m3 + bge-reranker + 真实 LLM）recall@5 0.9375 / MRR 0.9062 / answer EM 0.333（BENCHMARK_CARD §12）
 - 单 SQLite 连接 + asyncio.Lock 串行化写（高并发写入场景已知限制，见 backend/README §8）
 
 ## 常用命令（均在 WSL 执行）
@@ -99,6 +99,7 @@ cd backend
 ./.venv/bin/python -m uvicorn app.main:app --port 8000   # 启动；模型后端以 runtime_config(设置页) 为准
 ./start_mock.sh                                    # 一键离线 MOCK 启动（已把 runtime_config 置为 mock）
 ./.venv/bin/python -m app.evaluation.runner        # 旧 22 条手写评测
+./.venv/bin/python -m app.evaluation.real_full_runner --variants hybrid_rerank_llm   # 真实模型消融（需本地权重+LLM 配置，约 20 分钟/变体）
 
 # 前端（frontend/ 下）
 cd ../frontend
