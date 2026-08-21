@@ -25,13 +25,13 @@ PDF 上传 → Docling 结构化解析 → 混合检索 → 引用门控生成 �
 
 ```
 浏览器 (React SPA)
-   │  /api/v1
+   │
    ▼
-FastAPI 网关 (:8000)
-   ├─ 上传 → Docling 解析(page_no+bbox) → 结构化分块 → FAISS+FTS5 索引
-   ├─ 提问 → 混合检索(RRF) → Rerank → LLM SSE 生成(引用缓冲门控)
-   └─ 可观测性: 结构化日志 + /metrics
-存储: SQLite(元数据+FTS5+向量BLOB) + FAISS(内存索引)
+FastAPI 后端
+   ├─ 上传 → 解析 → 分块 → 向量索引
+   ├─ 提问 → 混合检索 → 重排 → LLM 生成 → 引用校验
+   └─ 可观测性（日志 + 指标）
+存储: SQLite + FAISS
 ```
 
 ## 🚀 快速开始
@@ -51,24 +51,7 @@ cd frontend && npm run dev   # http://localhost:5173
 
 默认 **MOCK 模式**，离线可跑全链路。真实模型在设置页切换，无需改代码。
 
-### 运行评测
-
-```bash
-cd backend
-bash ../scripts/evaluation/prepare.sh   # 下载 NIST PDF + 构建语料
-bash ../scripts/evaluation/run.sh       # 运行评测，报告写入 work/
-```
-
-## 📊 评测结果
-
-**NIST AI 100-1 / 600-1（18 题，16 answerable + 2 unanswerable）**
-
-| 指标 | recall@1 | recall@5 | MRR | nDCG@5 | 引用召回 | 答案 EM |
-|------|---------|---------|-----|--------|---------|--------|
-| mock 基线 | 0.625 | 0.844 | 0.747 | 0.754 | 0.844 | 0.063 |
-| 真实模型 | 0.813 | 0.938 | 0.906 | 0.907 | 0.813 | 0.214 |
-
-> 消融对比、CI 门禁、切片分析见 [docs/BENCHMARK_CARD.md](docs/BENCHMARK_CARD.md)
+> 评测方法与指标见 [docs/BENCHMARK_CARD.md](docs/BENCHMARK_CARD.md)
 
 ## 🖼️ 界面预览
 
@@ -80,23 +63,16 @@ bash ../scripts/evaluation/run.sh       # 运行评测，报告写入 work/
 
 ## 🛠️ 技术栈
 
-| 层 | 选型 |
-|----|------|
-| 前端 | React + TypeScript + Vite + Tailwind CSS + Radix UI + Zustand + pdfjs-dist + Lucide |
-| 后端 | FastAPI + Pydantic + SQLite（FTS5）+ FAISS + OpenAI SDK |
-| 解析 | Docling HybridChunker（page_no + bbox 溯源） |
-| 向量 | bge-m3（dense + sparse）|
-| 重排 | bge-reranker-v2-m3（CrossEncoder） |
-| 评测 | NIST 公开 PDF + LLM-as-Judge + bootstrap/Wilson CI |
+React + FastAPI + FAISS + SQLite + Docling + bge-m3 + OpenAI SDK
 
 ## 📁 项目结构
 
 ```
 docrag/
-├── backend/        # FastAPI 后端（core / services / repositories / routes / evaluation / tests）
-├── frontend/       # React SPA（pages / components / design）
-├── docs/           # 规格文档、架构、评测卡片
-└── scripts/        # 评测门禁脚本
+├── backend/    # FastAPI 后端
+├── frontend/   # React SPA
+├── docs/       # 规格文档
+└── scripts/    # 评测脚本
 ```
 
 ## ⚙️ 配置
@@ -110,7 +86,7 @@ docrag/
 ## 🧪 测试
 
 ```bash
-cd backend && python -m pytest -q   # 107 项
+cd backend && python -m pytest -q
 ```
 
 ## 🤝 贡献
