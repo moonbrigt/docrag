@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Cpu, Gauge, KeyRound, RefreshCw, Save } from 'lucide-react';
+import { Cpu, Gauge, KeyRound, RefreshCw, Save, Activity } from 'lucide-react';
 import { getRuntimeConfig, reindexAll, updateRuntimeConfig } from '@/api/config';
+import { getMetrics, type HistogramSnapshot } from '@/api/metrics';
 import { useBackends } from '@/hooks/useSystem';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -87,6 +88,9 @@ export function Settings() {
   const [device, setDevice] = useState('');
   const [cudaAvailable, setCudaAvailable] = useState(false);
 
+  // —— 性能指标 ——
+  const [latency, setLatency] = useState<Record<string, HistogramSnapshot>>({});
+
   useEffect(() => {
     getRuntimeConfig()
       .then((cfg) => {
@@ -107,6 +111,10 @@ export function Settings() {
       })
       .catch(() => setMessage({ tone: 'err', text: '读取当前配置失败，请刷新重试' }))
       .finally(() => setLoading(false));
+
+    getMetrics()
+      .then((m) => setLatency(m.histograms))
+      .catch(() => {}); // 静默失败，指标非关键
   }, []);
 
   const onSave = async () => {
@@ -420,6 +428,67 @@ export function Settings() {
           )}
         </CardBody>
       </Card>
+
+      {/* 性能概览 */}
+      {Object.keys(latency).length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <Activity size={18} className="text-accent" />
+              性能概览
+            </CardTitle>
+            <p className="text-xs text-meta">进程内延迟直方图（重启清零，需有流量才显示数据）</p>
+          </CardHeader>
+          <CardBody>
+            <div className="grid gap-4 sm:grid-cols-3">
+              {(['pipeline_latency_ms', 'retrieve_latency_ms', 'llm_latency_ms'] as const).map(
+                (key) => {
+                  const h = latency[key];
+                  if (!h || h.count === 0) return null;
+                  const label =
+                    key === 'pipeline_latency_ms'
+                      ? '索引管道'
+                      : key === 'retrieve_latency_ms'
+                        ? '检索'
+                        : 'LLM 生成';
+                  return (
+                    <div key={key} className="space-y-2 rounded-md border border-line p-3">
+                      <p className="text-sm font-medium text-fg">{label}</p>
+                      <div className="space-y-1 text-xs text-muted">
+                        <div className="flex justify-between">
+                          <span>avg</span>
+                          <span className="font-mono text-fg">{h.avg_ms.toFixed(0)} ms</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>p50</span>
+                          <span className="font-mono text-fg">{h.p50_ms.toFixed(0)} ms</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>p95</span>
+                          <span className="font-mono text-fg">{h.p95_ms.toFixed(0)} ms</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>max</span>
+                          <span className="font-mono text-fg">{h.max_ms.toFixed(0)} ms</span>
+                        </div>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
+                        <div
+                          className="h-full rounded-full bg-accent"
+                          style={{
+                            width: `${Math.min(100, (h.p95_ms / Math.max(h.max_ms, 1)) * 100)}%`,
+                          }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-meta">{h.count} 次采样</p>
+                    </div>
+                  );
+                },
+              )}
+            </div>
+          </CardBody>
+        </Card>
+      )}
     </div>
   );
 }

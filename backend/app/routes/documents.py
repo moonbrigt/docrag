@@ -86,6 +86,8 @@ async def delete_document(
     principal: auth.Principal = Depends(auth.get_principal),
 ):
     await document_service.delete_document(doc_id, principal)
+    from app.services import retrieve_service
+    retrieve_service.invalidate_cache()
     return None
 
 

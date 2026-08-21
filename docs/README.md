@@ -40,7 +40,7 @@
 | LLM | openai SDK + base_url：mock / ollama / openai（mock 确定性流式、默认；ollama/openai 为真实后端） |
 | 文档版本 | source_id + version（首版=1，替换原子 +1）+ is_active/archived_at；索引成功才 promote 归档旧版；`POST/GET /documents/{id}/versions` |
 | 文档生命周期 | cancel（仅瞬态，冲突 409）/ retry（failed/warning/cancelled 原子认领）；启动恢复瞬态 → failed；见 `docs/MATURITY_MATRIX.md` |
-| SSE 事件（/chat） | `stage`（retrieving/reranking/generating）/ `delta` / `citation`（含 sourceId/version/title/createdAt）/ `no_answer`（no_evidence/not_supported）/ `done`（selected_document_ids + trace_id）/ `error` |
+| SSE 事件（/chat） | `stage`（retrieving/reranking/generating）/ `delta` / `citation`（含 sourceId/version/title/createdAt + rrfScore/faissScore/ftsScore）/ `no_answer`（no_evidence/not_supported）/ `done`（selected_document_ids + trace_id）/ `error` |
 | API 前缀 | `/api/v1`（22 个端点，见 §4） |
 | DB 表 | documents（含 ACL/生命周期列）/ chunks / chunk_fts(FTS5 trigram) / evaluations / document_events（状态流转审计）/ trace（query 原文不落库）/ feedback / runtime_config（运行时模型配置覆盖；单文件 `app.db`，WAL） |
 | 文档状态机 | queued → parsing → chunking → embedding → indexed / warning（部分成功保留分块）/ failed（清理 partial）/ cancelled（终态）；重启时瞬态 → failed（service_restart_interrupted）；cancel/retry 原子认领 |
@@ -49,8 +49,9 @@
 | 反馈与追踪 | `POST /feedback`（rating + issue_type + 评论）、`GET /trace/{id}`（ACL 过滤；query 原文与可反查哈希不落库） |
 | 评测集 | 默认 `public_nist`：2 份 NIST PDF / 103 chunk / **18 题**（16 answerable + 2 unanswerable，含 2 条中文跨语言题，gold 为自建页码证据，非 NIST 官方 benchmark）；`synthetic_smoke`：旧 2 篇内嵌文档 / 12 页 / **22 条**中英问答 |
 | 评测指标 | 检索 Recall/Precision/Hit@K + hard_negative_recall@K、MRR、nDCG@K、citation page precision/recall + hard_negative_citation_rate、answer EM/F1（exact/set/rubric/numeric 容差/unanswerable 弃答判分）、bootstrap(seed=0) + Wilson CI、language/answer_type/tag/document 切片、provenance（真实模型适配器 VERIFIED/NOT_RUN）、报告确定性自检（见 `docs/BENCHMARK_CARD.md`） |
-| 指标端点 | 6 计数器（document_uploads_total / documents_indexed_total / documents_failed_total / queries_total / citations_returned_total / errors_total）+ 4 直方图（http_request_latency_ms / pipeline_latency_ms / retrieve_latency_ms / llm_latency_ms） |
+| 指标端点 | 6 计数器（document_uploads_total / documents_indexed_total / documents_failed_total / queries_total / citations_returned_total / errors_total）+ 4 直方图（http_request_latency_ms / pipeline_latency_ms / retrieve_latency_ms / llm_latency_ms，含 p50/p95/max） |
 | 设计 Token | accent `#3E63DD` / citation `#F5B544`；dark 默认 + light 双主题（`data-theme`）；禁 emoji / 紫粉渐变 / 硬编码色 |
+| 缓存 | `RAG_CACHE_TTL`（默认 300 秒，hybrid_retrieve 结果缓存 TTL；0=禁用）；reindex / 文档删除 / 索引成功时自动失效 |
 | MOCK 开关 | `RAG_LLM_MOCK` / `RAG_EMBED_MOCK` / `RAG_RERANK_MOCK` / `RAG_PARSE_MOCK`（默认全 true，离线可跑；false 时按 `*_BACKEND` 走真实模型）；`RAG_TRUSTED_PROXY`（默认 false，true 时信任反向代理注入的 X-Rag-Tenant/User/Group 身份头） |
 | 部署 | WSL（Ubuntu）原生：后端 `backend/.venv/bin/uvicorn app.main:app`，前端 `npm run dev/build`；`backend/start_mock.sh` 一键离线 MOCK 启动；Docker 已弃用并移除 |
 
@@ -114,6 +115,8 @@
 | 16 | 2026-08-12 成熟度扩展：模型 API 运行时配置 | 前端无配置入口，改后端必须改 env + 重建 | 新增 `GET/PUT /config/settings`（runtime_config 表持久化，覆盖优先于 env，即时生效）；设置页 /settings 落地；API key 明文存本地 SQLite、接口只回显 api_key_set；多租户产品化时收敛为管理员角色（见 MATURITY_MATRIX） |
 | 17 | 2026-08-20 解析链路实测 | `parser.py` HybridChunker 将 embed 模型名（Ollama `bge-m3`）当作 HF tokenizer id → 401，真实解析在切块阶段失败 | 改为固定 HF tokenizer `BAAI/bge-m3`，构造纳入 try，异常退回按页切分；Docling 在 WSL 实测通过（NIST AI 100-1/600-1、AI-Agents-in-Depth），结构化分块含 page_no/bbox/section |
 | 18 | 2026-08-20 WSL 迁移后文档对齐 | 文档仍以 Docker compose 为部署主路径、端点数为 11/19、目录结构与模型后端未反映 runtime_config 重构，且引用了不存在的 `PRD-文档RAG应用.md`/顶层 `web/`/`phase1-tech-research.md` | 统一为 WSL 原生部署并 delete Docker 遗留（compose/Dockerfile/nginx.conf/scripts-docker/manage.sh）；端点数=22（补 `POST /config/reindex`）；速查表补模型后端三档（mock/http/docling/pdf）与 `runtime_config` 表；目录树、测试数（79）对齐源码 |
+| 19 | 2026-08-21 real run provenance 裁决 | `work/public_nist_real_run.json` 的 `reranker_bge: RUN` 与 AGENTS.md 已知薄弱点（bge-reranker 仍为 mock 降级）矛盾；`docling: NOT_RUN` 与 pipeline.name 中 "Docling" 描述不符 | BENCHMARK_CARD 新增 §11 收录 real run 数据并标注 provenance 矛盾；README 简历卡片引用区间值 "recall@5 0.84–0.94" 并标注口径 |
+| 20 | 2026-08-21 citation 事件新增检索分数 | citation 事件不含 rrf/faiss/fts 分数，前端无法展示检索融合过程 | citation_service.py 新增 rrfScore/faissScore/ftsScore 字段；CitationPayload/Citation 类型同步；CitationChip tooltip 展示分数 |
 
 ## 6. 文档维护规则（防止再次漂移）
 

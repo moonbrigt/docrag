@@ -13,7 +13,18 @@ export function CitationChip({ citation }: { citation: Citation }) {
   const active = usePdfNav((s) => s.activeCitation);
   const isActive = active === citation.index;
   const label = citationLabel(citation);
-  const tooltip = citation.snippet ? `${label} — ${citation.snippet}` : label;
+  // 检索分数附加信息
+  const scores = [
+    citation.rrfScore != null ? `RRF ${citation.rrfScore.toFixed(4)}` : null,
+    citation.faissScore != null ? `FAISS ${citation.faissScore.toFixed(4)}` : null,
+    citation.ftsScore != null ? `FTS ${citation.ftsScore.toFixed(4)}` : null,
+  ]
+    .filter(Boolean)
+    .join(' | ');
+  const scoreLine = scores ? `\n检索分数: ${scores}` : '';
+  const tooltip = citation.snippet
+    ? `${label} — ${citation.snippet}${scoreLine}`
+    : `${label}${scoreLine}`;
 
   return (
     <Tooltip content={tooltip}>

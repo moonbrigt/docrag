@@ -93,6 +93,10 @@ async def run_pipeline(
         if promote_on_success:
             await _promote(doc_id)
 
+        # 新文档索引成功：清除缓存（scope 变化）
+        from app.services import retrieve_service
+        retrieve_service.invalidate_cache()
+
         elapsed_ms = (time.perf_counter() - start) * 1000.0
         get_metrics().incr("documents_indexed_total")
         get_metrics().observe("pipeline_latency_ms", elapsed_ms)

@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     FAISS_TOP_K: int = 20
     FTS_TOP_K: int = 20
 
+    # 查询缓存
+    CACHE_TTL: int = 300  # hybrid_retrieve 结果缓存 TTL（秒），0=禁用
+
     # 身份与访问控制（ACL）
     # 仅当 RAG_TRUSTED_PROXY=true 时，才从反向代理注入的 X-Rag-Tenant /
     # X-Rag-User / X-Rag-Group 请求头解析身份；否则一律使用本地默认

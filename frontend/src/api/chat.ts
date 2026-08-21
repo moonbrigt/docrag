@@ -80,6 +80,9 @@ function normalizeCitation(raw: CitationPayload, fallbackIndex: number): Citatio
     title: typeof raw.title === 'string' ? raw.title : undefined,
     version: typeof raw.version === 'number' || typeof raw.version === 'string' ? raw.version : undefined,
     createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : undefined,
+    rrfScore: typeof raw.rrfScore === 'number' ? raw.rrfScore : undefined,
+    faissScore: raw.faissScore ?? undefined,
+    ftsScore: raw.ftsScore ?? undefined,
   };
 }
 

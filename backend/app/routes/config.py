@@ -126,6 +126,7 @@ async def put_settings(req: SettingsIn):
 async def reindex_all():
     """按当前嵌入后端重新编码全部 chunk 向量（换模型后调用，保持维度一致）。"""
     from app.core.errors import ModelNotReadyError
+    from app.services import retrieve_service
 
     try:
         count = await index_service.reindex_all()
@@ -133,4 +134,5 @@ async def reindex_all():
         raise HTTPException(status_code=503, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"重索引失败：{exc}")
+    retrieve_service.invalidate_cache()
     return {"ok": True, "reindexed": count}

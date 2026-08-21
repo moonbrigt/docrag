@@ -98,6 +98,10 @@ export interface Citation {
   title?: string | null;
   version?: number | string | null;
   createdAt?: string | null;
+  // 检索分数（混合检索融合后的可解释性）
+  rrfScore?: number;
+  faissScore?: number | null;
+  ftsScore?: number | null;
 }
 
 export interface ChatRequest {
@@ -127,6 +131,10 @@ export interface CitationPayload {
   title?: string | null;
   version?: number | string | null;
   createdAt?: string | null;
+  // 检索分数
+  rrfScore?: number;
+  faissScore?: number | null;
+  ftsScore?: number | null;
 }
 
 export interface EvidenceCandidate {

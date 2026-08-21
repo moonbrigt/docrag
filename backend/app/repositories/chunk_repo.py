@@ -51,6 +51,37 @@ async def insert_chunk(
     return await db.write(_insert)
 
 
+async def insert_chunks_bulk(
+    items: list[dict],
+) -> list[int]:
+    """批量插入分块及其 FTS 条目（单事务），返回 chunk id 列表。
+
+    items: list of dict with keys: document_id, seq, content, page_no, bbox, section,
+           embedding_blob, fts_extra
+    """
+
+    def _insert(c):
+        ids: list[int] = []
+        for item in items:
+            bbox_json = _bbox_to_json(item.get("bbox"))
+            cur = c.execute(
+                "INSERT INTO chunks (document_id, seq, content, page_no, bbox, section, embedding) "
+                "VALUES (?,?,?,?,?,?,?)",
+                (
+                    item["document_id"], item["seq"], item["content"],
+                    item["page_no"], bbox_json, item.get("section"),
+                    item.get("embedding_blob"),
+                ),
+            )
+            cid = cur.lastrowid
+            ids.append(cid)
+            fts_text = item["content"] + (" " + item.get("fts_extra", "") if item.get("fts_extra") else "")
+            c.execute("INSERT INTO chunk_fts (rowid, content) VALUES (?, ?)", (cid, fts_text))
+        return ids
+
+    return await db.write(_insert)
+
+
 async def list_chunks_by_doc(document_id: str) -> list[dict]:
     rows = db.query(
         "SELECT id, document_id, seq, content, page_no, bbox, section "

@@ -231,3 +231,6 @@ curl -X POST http://localhost:8000/api/v1/evaluation/run
 | 2026-08-12-5 | 契约扩展：版本化评测 | `/evaluation/run` 默认 profile `public_nist`（NIST 公开 PDF + 自建 gold，18 题；未 prepare 返回 409）；旧 22 条内嵌问答归 `synthetic_smoke`；报告含 CI/切片/per-query/provenance；真实模型适配器 NOT_RUN；基准详情见 docs/BENCHMARK_CARD.md | Spec §5 |
 | 2026-08-12-6 | 契约扩展：运行时模型配置 | 新增 `GET/PUT /config/settings`：LLM 后端/base_url/model/api_key 运行时覆盖（runtime_config 表持久化，覆盖优先于 env 默认，即时生效无需重启；API key 明文存本地 SQLite 且接口只回传 api_key_set）；设置页落地（/settings）；多租户产品化时应收敛为管理员角色 | Spec §5/§6 |
 | 2026-08-20 | WSL 迁移对齐 | 移除 Docker 部署（F8/AC-09/部署章/端到端验证步骤），统一为 WSL 原生 uvicorn+Vite；默认后端 mock，真实模型经 settings 运行时配置覆盖 env | §4/§6/§10/§12 |
+| 2026-08-21-1 | 契约扩展：查询缓存 | 新增 `RAG_CACHE_TTL` env（默认 300 秒）；hybrid_retrieve 结果 LRU+TTL 缓存，键用 resolved scope（ACL 过滤后的可见文档集）避免越权；reindex / 文档删除 / 索引成功时自动失效 | §4 env、§5 retrieve 服务 |
+| 2026-08-21-2 | 契约扩展：citation 检索分数 | citation SSE 事件新增 rrfScore / faissScore / ftsScore 字段（从 RetrievedChunk 传递）；前端 CitationChip tooltip 展示混合检索融合分数 | §5 SSE 协议 |
+| 2026-08-21-3 | 指标扩展：直方图 p50 | /metrics 直方图 snapshot 新增 p50_ms 字段（中位数） | §5 /metrics 端点 |

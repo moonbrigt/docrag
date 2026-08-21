@@ -75,20 +75,22 @@ async def index_parsed_chunks(document_id: str, parsed_chunks: list) -> int:
         return 0
     contents = [c.content for c in parsed_chunks]
     dense, sparse = _embedder.embed(contents)
+    # 批量写库：单事务插入所有分块 + FTS 条目，减少 N 次 db.write 为 1 次
+    items = []
     for seq, (ch, vec, sp) in enumerate(zip(parsed_chunks, dense, sparse), start=1):
         blob = np.asarray(vec, dtype=np.float32).tobytes()
-        # sparse 词表前 50 个高频词补入 FTS，增强关键词召回
         top_terms = " ".join(k for k, _ in sorted(sp.items(), key=lambda kv: -kv[1])[:50])
-        await chunk_repo.insert_chunk(
-            document_id=document_id,
-            seq=seq,
-            content=ch.content,
-            page_no=ch.page_no,
-            bbox=ch.bbox,
-            section=ch.section,
-            embedding_blob=blob,
-            fts_extra=top_terms,
-        )
+        items.append({
+            "document_id": document_id,
+            "seq": seq,
+            "content": ch.content,
+            "page_no": ch.page_no,
+            "bbox": ch.bbox,
+            "section": ch.section,
+            "embedding_blob": blob,
+            "fts_extra": top_terms,
+        })
+    await chunk_repo.insert_chunks_bulk(items)
     # 统一从持久化重建内存索引，保证 chunk id 对齐
     await rebuild_faiss()
     return len(parsed_chunks)

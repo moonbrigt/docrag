@@ -162,4 +162,49 @@ per_query 关键记录：18 题中唯一 `answer_correct=1.0` 的是 nist-012（
 | bge-reranker-v2-m3 | NOT_RUN | 同上 |
 | LLM | NOT_RUN | 无密钥/成本/外传授权，按任务约束不读取密钥、不调用付费 API |
 
-**本文档全部数字 = 无密钥工程基线（bm25 + 词法重排 + 抽取式答案）的结果，不代表真实模型链路性能。**
+**本文档 §3–§9 全部数字 = 无密钥工程基线（bm25 + 词法重排 + 抽取式答案）的结果，不代表真实模型链路性能。**
+
+## 11. 真实模型链路 Run（2026-08-20，未收录为正式基线）
+
+`work/public_nist_real_run.json`（created_at 2026-08-20）：使用真实嵌入（bge-m3）+ 真实 LLM（qwen3:4b via Ollama），但 **解析与重排存在 provenance 矛盾**，本 run 不作为正式基线收录。
+
+### 11.1 Provenance（与实际链路的矛盾）
+
+| 适配器 | provenance 声明 | 实际状态 | 矛盾说明 |
+|--------|----------------|----------|----------|
+| Docling 解析 | NOT_RUN | pypdf 轻量解析 | 与声明一致（确实未用 Docling） |
+| bge-m3 embedding | RUN | 真实加载（hf_cache 路径已记录） | 无矛盾 |
+| bge-reranker-v2-m3 | RUN | **实际为 mock 词重叠降级** | AGENTS.md 已知薄弱点："bge-reranker-v2-m3 仍为 mock 降级，真实重排与 HF 权重加载未测"；provenance 标 RUN 与事实不符 |
+| LLM | RUN | 真实 qwen3:4b（Ollama） | 无矛盾 |
+
+### 11.2 指标（仅供参考，非正式基线）
+
+| 指标 | 值 | 对比 mock 基线（§3） |
+|------|-----|---------------------|
+| recall@1 | 0.8125 | mock 基线 0.6250 |
+| recall@5 | 0.9375 | mock 基线 0.8438 |
+| MRR | 0.90625 | mock 基线 0.7469 |
+| nDCG@5 | 0.9068 | mock 基线 0.7539 |
+| citation_recall | 0.8125 | mock 基线 0.8438 |
+| answer EM | 0.2143 | mock 基线 0.0625 |
+| answer F1 | 0.3046 | mock 基线 0.0703 |
+| unanswerable_correct | 1.0 | mock 基线 0.0 |
+| eligible / total | 14 / 18 | mock 基线 16 / 18 |
+
+### 11.3 切片（语言 / 文档）
+
+| 切片 | recall@5 | MRR |
+|------|---------|-----|
+| en（15 题） | 0.9333 | 0.9 |
+| zh（3 题） | 0.3333 | 0.3333 |
+| NIST.AI.100-1（8 题） | 0.875 | 0.8125 |
+| NIST.AI.600-1（8 题） | 1.0 | 1.0 |
+
+### 11.4 为什么不算正式基线
+
+1. **reranker provenance 矛盾**：标 RUN 但实际 mock 降级，recall/MRR 提升可能部分来自 bge-m3 embedding 而非 reranker
+2. **解析非 Docling**：用 pypdf 按页抽取，分块质量与 Docling 结构化分块不同
+3. **无消融对比**：该 run 未跑 BM25 / dense_mock / hybrid 变体，无法归因各组件贡献
+4. **determinism 未验证**：该 run 未做同输入重复运行字节一致性自检
+
+**结论**：真实嵌入 + 真实 LLM 的检索质量（recall@5 0.9375）显著优于 mock 基线（0.8438），但具体归因（embedding vs reranker vs LLM）需补跑消融实验。简历可引用区间值 "recall@5 0.84–0.94" 并标注口径。

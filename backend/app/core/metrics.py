@@ -25,12 +25,13 @@ class _Histogram:
     def snapshot(self) -> dict:
         with self._lock:
             if not self._samples:
-                return {"count": 0, "avg_ms": 0.0, "p95_ms": 0.0, "min_ms": 0.0, "max_ms": 0.0}
+                return {"count": 0, "avg_ms": 0.0, "p50_ms": 0.0, "p95_ms": 0.0, "min_ms": 0.0, "max_ms": 0.0}
             s = sorted(self._samples)
             n = len(s)
             return {
                 "count": n,
                 "avg_ms": round(sum(s) / n, 2),
+                "p50_ms": round(s[n // 2], 2),
                 "p95_ms": round(s[min(n - 1, int(n * 0.95))], 2),
                 "min_ms": round(s[0], 2),
                 "max_ms": round(s[-1], 2),

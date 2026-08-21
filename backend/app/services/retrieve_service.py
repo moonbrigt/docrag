@@ -6,10 +6,13 @@
   禁止泄漏无权限 / 范围外文档的分块。
 - FTS 路以范围 IN 条件直查；两路都带范围过滤后才融合。
 - 过滤后结果可能少于 top_k（范围小的私库常见），不注水。
+
+缓存：LRU + TTL，键 = (query, frozenset(scope))，避免同租户不同用户共享缓存。
 """
 from __future__ import annotations
 
 import re
+import time
 
 from app import auth, db
 from app.config import get_settings
@@ -20,6 +23,51 @@ from app.services import document_service, index_service
 
 _settings = get_settings()
 _SAFE = re.compile(r"[^0-9a-zA-Z一-鿿 ]")
+
+# ---------- 查询缓存（LRU + TTL） ----------
+_cache: dict[str, tuple[float, list[RetrievedChunk]]] = {}
+
+
+def _cache_key(query: str, scope: frozenset[str]) -> str:
+    """键 = query + resolved scope（已做 ACL 过滤的可见文档集）。"""
+    return f"{query}|{'|'.join(sorted(scope))}"
+
+
+def _cache_get(key: str) -> list[RetrievedChunk] | None:
+    """命中且未过期则返回缓存结果，否则 None。"""
+    if _settings.CACHE_TTL <= 0:
+        return None
+    entry = _cache.get(key)
+    if entry is None:
+        return None
+    ts, result = entry
+    if (time.monotonic() - ts) > _settings.CACHE_TTL:
+        _cache.pop(key, None)
+        return None
+    return result
+
+
+def _cache_set(key: str, result: list[RetrievedChunk]) -> None:
+    if _settings.CACHE_TTL <= 0:
+        return
+    _cache[key] = (time.monotonic(), result)
+    # 简易 LRU：超 500 条时淘汰最早插入的 100 条
+    if len(_cache) > 500:
+        oldest = sorted(_cache, key=lambda k: _cache[k][0])[:100]
+        for k in oldest:
+            _cache.pop(k, None)
+
+
+def invalidate_cache(tenant_id: str | None = None) -> None:
+    """清除缓存。reindex / 文档删除 / 模型切换时调用。"""
+    if tenant_id is None:
+        _cache.clear()
+    else:
+        keys_to_remove = [k for k in _cache if k.endswith(f"|{tenant_id}") or "|" not in k]
+        for k in keys_to_remove:
+            _cache.pop(k, None)
+    # 简化：reindex 时清全部缓存（文档集变化影响所有 scope）
+    _cache.clear()
 
 # FAISS 过采样倍数：全局 top-k 过滤到范围后可能损失候选，放大后取回
 _FAISS_OVERSAMPLE = 3
@@ -103,6 +151,12 @@ async def hybrid_retrieve(
     if not scope:
         return []
 
+    # 缓存命中检查（键用 resolved scope，避免越权）
+    ck = _cache_key(query, scope)
+    cached = _cache_get(ck)
+    if cached is not None:
+        return cached
+
     embedder = index_service.get_embedder()
     faiss = index_service.get_faiss()
     if not embedder.is_ready():
@@ -159,4 +213,5 @@ async def hybrid_retrieve(
                 created_at=meta.get("created_at"),
             )
         )
+    _cache_set(ck, result)
     return result

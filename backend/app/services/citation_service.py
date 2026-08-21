@@ -43,6 +43,10 @@ def build_citations(
                 "title": rc.title,
                 "createdAt": rc.created_at,
                 "processingMs": round(processing_ms, 2) if processing_ms is not None else None,
+                # 检索分数（混合检索融合后的可解释性）
+                "rrfScore": round(rc.rrf_score, 6),
+                "faissScore": rc.faiss_score,
+                "ftsScore": rc.fts_score,
             }
         )
     return out
