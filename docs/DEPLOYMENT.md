@@ -107,6 +107,8 @@ export RAG_LLM_MODEL=qwen3:4b
 | RAG_FAISS_TOP_K | 20 | FAISS 稠密路候选数 |
 | RAG_FTS_TOP_K | 20 | FTS5 关键词路候选数 |
 | RAG_RERANK_TOP_K | 5 | 重排后保留数 |
+| RAG_RERANK_CANDIDATES | 10 | 送入重排的候选池上限（RRF 融合序先截断，CPU 重排延迟与候选数线性相关） |
+| RAG_RERANK_MAX_TOKENS | 256 | 重排输入 token 截断（CPU 延迟-质量平衡：512→256 约 3 倍提速） |
 | RAG_CACHE_TTL | 300 | hybrid_retrieve 结果缓存 TTL（秒），0=禁用 |
 | RAG_TRUSTED_PROXY | false | true 时信任反向代理注入的 X-Rag-Tenant/User/Group 头解析身份（ACL 依赖） |
 | RAG_PORT | 8000 | 后端监听端口 |

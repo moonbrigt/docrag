@@ -92,5 +92,7 @@ class RerankService:
             return scores
 
         pairs = [(query, p) for p in passages]
-        raw = self._model.predict(pairs, show_progress_bar=False)
+        raw = self._model.predict(
+            pairs, show_progress_bar=False, max_length=_settings.RERANK_MAX_TOKENS
+        )
         return [float(np.asarray(x).reshape(-1)[0]) for x in raw]

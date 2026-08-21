@@ -7,13 +7,14 @@
 - 验证基线：`moonbrigt/docrag` 分支 main（基线 `64414d7`）+ 本轮未提交的成熟度改动（ACL/生命周期/版本/no-answer/反馈/trace/评测）。
 - 宿主复核执行于 2026-08-12：Python 3.12.3（评测 venv）、node v24.19.0、pytest 9.1.1、fastapi 0.115.13、pypdf 6.15.0、faiss-cpu 1.14.3、numpy 2.5.2。
 
-## 2. 测试文件清单与覆盖点（backend/app/tests/，15 文件 / 107 用例节点）
+## 2. 测试文件清单与覆盖点（backend/app/tests/，16 文件 / 109 用例节点）
 
 | 文件 | 用例数 | 覆盖点 |
 |------|--------|--------|
 | test_documents.py | 5 | 上传→indexed 全流程、列表空态、详情 404、原文文件服务与删除、缺文件 404 |
 | test_health.py | 2 | /health 健康状态、/config/backends 后端就绪 |
 | test_cache.py | 9 | 查询缓存 TTL/命中/失效（reindex、删除、索引成功时清除）、禁用开关 |
+| test_rerank_service.py | 2 | 重排候选池截断（RERANK_CANDIDATES）、全文回查（非 snippet）、小池直通 |
 | test_citation.py | 19 | citation 分数透传、引用缓冲校验、引用页过滤与 no_answer 联动 |
 | test_maturity_acl.py | 9 | ACL 端点权限、撤权 fail-closed（立即 404）、admin 绕过可见性、CORS 不含 X-Rag-*、检索双路范围限定、文档列表契约字段、显式空范围零结果、本地模式忽略身份头、trusted-proxy 租户隔离 |
 | test_maturity_chat.py | 7 | 空库 409、no_evidence 不调用 LLM、not_supported（有证据无引用不泄出 delta）、rerank fail-closed、SSE 全流程契约、trace 访问控制、query 原文不落库 |
@@ -29,12 +30,12 @@
 
 ## 3. 实测结果
 
-### 3.1 后端全量 pytest：✅ 107 passed（2026-08-21 WSL 复核）
+### 3.1 后端全量 pytest：✅ 109 passed（2026-08-21 WSL 复核）
 
 | 项 | 结果 |
 |----|------|
-| 本次复核（backend venv，`./.venv/bin/python -m pytest -q`） | **107 passed in ~10.8s**，零失败零跳过（在 WSL 实测确认） |
-| 覆盖 | 15 文件 / 107 用例节点，含 4 个成熟度测试文件（acl/chat/lifecycle/versions）、公开评测测试、cache / citation、runtime_config / embed_http / accelerator / public_real |
+| 本次复核（backend venv，`./.venv/bin/python -m pytest -q`） | **109 passed in ~8.7s**，零失败零跳过（在 WSL 实测确认） |
+| 覆盖 | 16 文件 / 109 用例节点，含 4 个成熟度测试文件（acl/chat/lifecycle/versions）、公开评测测试、cache / citation / rerank_service、runtime_config / embed_http / accelerator / public_real |
 | 修复记录 | 此前发现在 `backend/app/db.py` 上 `_migrate` 先于建表执行会让全新数据库报 `no such table: documents`（当时 23 passed / 38 errors）；修复为 `_migrate` 增加 `sqlite_master` 存在性守卫（表不存在即跳过 ALTER，全新库交 SCHEMA 建表）——新库（pytest 临时库）与既有库双路径回归均通过 |
 
 ### 3.2 评测专项（独立于 3.1 的 db 初始化，可复现）
@@ -65,6 +66,7 @@
 - chat SSE 全链路（stage/delta/citation/done）：引用页码 3/44/26/7/9 均为 AI RMF 相关章节，citation 含真实 bbox 与 snippet
 - 结论：**Docling 真实解析 = VERIFIED**（CPU，48 页 + TableFormer 首次含模型下载约 506MB，全流程约 8 分钟）；bge-m3 嵌入与对话分别走 Ollama 本地模型已验证；bge-reranker-v2-m3 真实 CrossEncoder 已于 2026-08-21 在消融评测中加载验证（见下条）
 - 真实模型全链路消融（2026-08-21，`backend/app/evaluation/real_full_runner.py`）：bge-m3（FlagEmbedding 本地权重）+ bge-reranker-v2-m3（CrossEncoder，CPU）+ 真实云端 LLM 四变体消融，18 题全跑通；hybrid_rerank_llm recall@5 0.9375 / MRR 0.9062 / answer EM 0.333 / unanswerable 1.0；词法 vs 神经重排同口径对比：词法零增益（MRR 持平 0.752）、神经 +0.154；检索指标跨 run 一致（确定性成立），报告 `work/real_full_report.json` + `work/real_full_lexical.json`（数字与边界见 BENCHMARK_CARD §12）
+- **生产运行时切换全真实配置**（2026-08-21）：runtime_config = docling 解析 + Ollama bge-m3 嵌入 + bge-reranker-v2-m3 重排 + 云端 LLM；端到端 chat 实测（WSL、热缓存、真实 trace）：检索 2.9s + 重排 7.7s（候选 10 × 256 token）+ 生成 12.7s ≈ 23s 总延迟，SSE 全事件流（stage/delta/citation/done）正常，引用含真实 page/bbox；`/config/backends` 三后端 ready=true
 
 ## 5. 已知问题清单（2026-08-20 核对）
 

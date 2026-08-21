@@ -57,6 +57,8 @@ class Settings(BaseSettings):
     RRF_K: int = 60
     RETRIEVE_TOP_K: int = 20  # RRF 融合前的每路候选数
     RERANK_TOP_K: int = 5  # 重排后保留数
+    RERANK_CANDIDATES: int = 10  # 送入重排的候选池上限（融合结果先截断再重排）
+    RERANK_MAX_TOKENS: int = 256  # 重排输入 token 截断（CPU 延迟-质量平衡）
     FAISS_TOP_K: int = 20
     FTS_TOP_K: int = 20
 
