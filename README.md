@@ -106,15 +106,11 @@ bash ../scripts/evaluation/run.sh       # 运行评测，报告写入 work/
 
 ## 🛠️ 技术栈
 
-| 层 | 选型 |
-|----|------|
-| 前端 | React 19 + Vite 8 + TypeScript 5.6 + Tailwind CSS 4 + Radix UI + pdfjs-dist |
-| 后端 | FastAPI 0.115 + Pydantic 2.11 + SQLite + FAISS |
-| 解析 | Docling（HybridChunker，page_no + bbox 溯源） |
-| 嵌入 | bge-m3（dense+sparse）/ OpenAI 兼容 API |
-| 重排 | bge-reranker-v2-m3（CrossEncoder） |
-| LLM | OpenAI SDK + base_url（Ollama / OpenAI 兼容） |
-| 评测 | NIST 公开 PDF + 自建 gold，bootstrap/Wilson CI |
+**前端**：React + TypeScript + Vite + Tailwind CSS + pdfjs-dist
+
+**后端**：FastAPI + SQLite（FTS5）+ FAISS + Docling + bge-m3 + bge-reranker + OpenAI 兼容 API
+
+**评测**：NIST 公开 PDF 评测集 + LLM-as-Judge + bootstrap/Wilson CI
 
 ## 📁 项目结构
 
