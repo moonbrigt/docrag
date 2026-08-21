@@ -1,3 +1,5 @@
+<!-- lang: zh-CN -->
+
 # DocRAG
 
 <div align="center">
@@ -108,7 +110,7 @@ bash ../scripts/evaluation/run.sh       # 运行评测，报告写入 work/
 
 **前端**：React + TypeScript + Vite + Tailwind CSS + pdfjs-dist
 
-**后端**：FastAPI + SQLite（FTS5）+ FAISS + Docling + bge-m3 + bge-reranker + OpenAI 兼容 API
+**后端**：FastAPI + SQLite（FTS5）+ FAISS + Docling + bge-m3 + bge-reranker + OpenAI SDK
 
 **评测**：NIST 公开 PDF 评测集 + LLM-as-Judge + bootstrap/Wilson CI
 
