@@ -55,18 +55,7 @@ cd backend && ./start_mock.sh
 cd frontend && npm run dev   # http://localhost:5173
 ```
 
-默认 **MOCK 模式**，离线可跑全链路。真实模型在设置页配置即可。
-
-### 接入真实模型
-
-打开 `http://localhost:5173/settings`：
-
-| 模块 | 支持后端 |
-|------|---------|
-| LLM | Ollama / OpenAI 兼容 API（硅基流动、OpenRouter 等） |
-| 嵌入 | bge-m3（本地）/ OpenAI 兼容 /v1/embeddings |
-| 重排 | bge-reranker-v2-m3 / mock |
-| 解析 | Docling（结构化）/ pypdf（轻量）/ mock |
+默认 **MOCK 模式**，离线可跑全链路。真实模型在设置页切换，无需改代码。
 
 ### 运行评测
 
