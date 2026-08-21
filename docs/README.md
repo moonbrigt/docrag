@@ -36,7 +36,7 @@
 | 向量 | SQLite(BLOB) + FAISS 1.14.3（IndexFlatIP，归一化 = cosine） |
 | 关键词 | SQLite FTS5（trigram；1–2 字中文 LIKE 兜底） |
 | 重排 | bge-reranker-v2-m3 / mock（本地 CrossEncoder / 词重叠） |
-| 融合 | RRF(k=60) → top-20 → 截断 `RAG_RERANK_CANDIDATES=10` → 重排（全文、`RAG_RERANK_MAX_TOKENS=256`）→ top-5 |
+| 融合 | RRF(k=60) → top-20 → 截断 `RAG_RERANK_CANDIDATES=15` → 重排（全文、`RAG_RERANK_MAX_TOKENS=256`）→ top-5 |
 | LLM | openai SDK + base_url：mock / ollama / openai（mock 确定性流式、默认；ollama/openai 为真实后端） |
 | 文档版本 | source_id + version（首版=1，替换原子 +1）+ is_active/archived_at；索引成功才 promote 归档旧版；`POST/GET /documents/{id}/versions` |
 | 文档生命周期 | cancel（仅瞬态，冲突 409）/ retry（failed/warning/cancelled 原子认领）；启动恢复瞬态 → failed；见 `docs/MATURITY_MATRIX.md` |
@@ -120,6 +120,7 @@
 | 21 | 2026-08-21 真实模型消融评测收录 | BENCHMARK_CARD §11 real run 归因缺口（embedding vs reranker 贡献不可分）与 AGENTS 薄弱点「bge-reranker 真实权重未测」悬置 | 新增 `real_full_runner.py` 三变体消融（bm25 / hybrid / hybrid+reranker，bge-m3+bge-reranker+真实 LLM 全真实），BENCHMARK_CARD §12 正式收录（recall@5 0.9375 / MRR 0.9062，重排增量 MRR +0.154）；测试数 79→107（新增 test_cache/test_citation 共 28 项）；AGENTS / VALIDATION / MATURITY_MATRIX / REPRODUCE 同步；`work/eval_reports/public_nist_report.json` 于 WSL 复跑再生成（指标与原报告一致） |
 | 22 | 2026-08-21 词法 vs 神经重排同口径对比 | §12.4 遗留「词法/神经重排相对优劣」未验证；发现初版 bm25_real_llm 误用 Jaccard 词法重排（口径 bug） | runner 词法重排统一为 `baselines.LexicalReranker`（与生产 mock 同实现），新增 hybrid_lexical_llm 变体并重跑 bm25；结论（BENCHMARK_CARD §12.3）：词法重排在 hybrid 池零增益（MRR 持平 0.752），神经重排 MRR +0.154；bm25 口径修正后与 mock 基线 MRR 0.7469 完全一致（检索确定性跨模型验证） |
 | 23 | 2026-08-21 生产切换真实重排 + docling 解析 | 用户要求弃用 mock（词法重排已证零增益）；生产重排存在两处问题：喂给模型的是 200 字符 snippet（信号不足）、候选池为 RRF 融合全量（最多 40 对，CPU 全文 512 token 重排不可用） | runtime_config 切 rerank=bge-reranker-v2-m3 + parse=docling；rerank_service 改为 chunk_repo 回查全文 + 候选截断（`RERANK_CANDIDATES=10`）；core/reranker score 传 `max_length=RERANK_MAX_TOKENS=256`；端到端实测（WSL 热缓存）：检索 2.9s + 重排 7.7s + 生成 12.7s ≈ 23s，引用 page/bbox 正常；新增 test_rerank_service（截断+全文断言），109 passed |
+| 24 | 2026-08-21 生产重排参数校准（候选池 10→15） | §12.2 基线口径（15 候选/512 token）与生产参数（10/256）不同，延迟优化未验证质量；实测 10/256 recall@5 0.875 / MRR 0.787，显著低于基线 | 新增 hybrid_rerank_prod_llm 变体（读 RAG_RERANK_* 配置，env 可覆盖）跑隔离实验（BENCHMARK_CARD §12.5）：候选池 10 是 recall@5 掉点主因（gold 被截在 RRF 第 11-15 位），token 256 损失 top-1 精度；定标 `RERANK_CANDIDATES=15`（recall@5 恢复 0.9375，生产重排 11.4s）；384 边际收益不值 +7.5s |
 
 ## 6. 文档维护规则（防止再次漂移）
 

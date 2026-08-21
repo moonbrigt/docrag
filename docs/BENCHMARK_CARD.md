@@ -211,7 +211,7 @@ per_query 关键记录：18 题中唯一 `answer_correct=1.0` 的是 nist-012（
 
 ## 12. 真实模型全链路消融（2026-08-21，正式收录）
 
-运行入口 `backend/app/evaluation/real_full_runner.py`（WSL 实测）。主报告 `work/real_full_report.json`（三变体同进程跑完）；`work/real_full_lexical.json`（词法口径 run：bm25 修正 + hybrid_lexical）；另各变体单独复跑一次（`work/real_full_{bm25,hybrid,rerank}.json`）作可复现性核验。
+运行入口 `backend/app/evaluation/real_full_runner.py`（WSL 实测）。主报告 `work/real_full_report.json`（三变体同进程跑完）；`work/real_full_lexical.json`（词法口径 run：bm25 修正 + hybrid_lexical）；另各变体单独复跑一次（`work/real_full_{bm25,hybrid,rerank}.json`）作可复现性核验；§12.5 生产参数校准报告 `work/real_full_{prod_rerank,p15_t256,p15_t384}.json`。
 
 ### 12.1 Provenance（无矛盾）
 
@@ -253,3 +253,26 @@ per_query 关键记录：18 题中唯一 `answer_correct=1.0` 的是 nist-012（
 - 18 题 / 103 chunk 样本量小，CI 宽（见 §7），结论仅对该语料成立；「词法重排零增益」对该重排实现（保序调制设计）成立，不排除更强词法特征（如 BM25 特征交叉）能产生增益。
 - 语料为 pypdf 按页抽取，非 Docling 结构化分块——解析质量不在本消融范围内（Docling 真实解析单独 VERIFIED，见 VALIDATION §4）。
 - LLM 具体型号以运行时配置为准，answer 类指标不可跨 LLM 配置直接对比。
+
+### 12.5 生产重排参数校准（2026-08-21，hybrid_rerank_prod_llm 变体）
+
+§12.2 的 hybrid_rerank_llm 用 15 候选/512 token（基线口径），生产配置为候选截断 + token 截断——**两者口径不同，生产参数需单独验证**。prod 变体直接读 `RAG_RERANK_CANDIDATES` / `RAG_RERANK_MAX_TOKENS`（env 可覆盖），隔离实验用 `RAG_RERANK_*=… python -m app.evaluation.real_full_runner --variants hybrid_rerank_prod_llm` 跑出。
+
+检索指标（确定性，跨 run 可比）：
+
+| 候选/ token | recall@1 | recall@3 | recall@5 | MRR | nDCG@5 | eval wall | 生产重排延迟* |
+|---|---|---|---|---|---|---|---|
+| 15 / 512（基线口径） | 0.8125 | 0.9062 | 0.9375 | 0.9062 | 0.9051 | 1044s | ~46s（不可用） |
+| 10 / 256（初版生产） | 0.6875 | 0.7812 | 0.8750 | 0.7865 | 0.7988 | 316s | 7.7s |
+| 15 / 256（**当前生产**） | 0.7500 | 0.7812 | 0.9375 | 0.8438 | 0.8570 | 417s | **11.4s** |
+| 15 / 384 | 0.7500 | 0.9062 | **0.9688** | 0.8802 | 0.8859 | 474s | 18.9s |
+
+\* 生产重排延迟 = 真实 chat trace 的 reranking_ms（WSL CPU，Docling 块语料）。
+
+结论：
+
+1. **候选池 10 是 recall@5 掉点主因**：15/256 完全恢复 recall@5（0.9375），说明 gold chunk 曾被截在 RRF 第 11–15 位。候选截断是结构性风险，token 截断不是。
+2. **token 256 损失的是 top-1 精度**（MRR 0.844 vs 0.906）；384 可再买回一半（0.880），但生产延迟 +7.5s。
+3. **384 在本语料上 recall@5 反超 512**（0.9688 > 0.9375）——整页长 chunk 截尾去噪的偶然收益，勿超读为「截断有益」。
+4. **定标 15/256**：recall@5（答案正确性门槛指标）恢复基线，生产重排 11.4s；384 的边际收益按整页 chunk 测得，生产 Docling 块中位 ~700 字符本就在 256 token 内，实际收益更小，不值 +7.5s。
+5. 边界：生产重排延迟随语料块长分布变化（Docling 块 < 256 token 时不付截断代价）；升级路径 = ONNX int8 量化（预计 2–3× 提速，需引 optimum/onnxruntime 依赖，未做）。

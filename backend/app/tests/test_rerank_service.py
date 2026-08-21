@@ -60,10 +60,10 @@ def test_rerank_truncates_candidates_and_uses_fulltext():
     finally:
         rerank_service._reranker.score = original
 
-    assert captured["n"] == 10  # 候选池 20 → 截断 RERANK_CANDIDATES=10
+    assert captured["n"] == 15  # 候选池 20 → 截断 RERANK_CANDIDATES=15
     assert captured["first"].startswith("FULLTEXT-1")  # 全文而非 snippet-1
     assert len(out) == 5  # RERANK_TOP_K
-    assert out[0].chunk_id == 10  # 最高分（FULLTEXT-10）排最前
+    assert out[0].chunk_id == 15  # 最高分（FULLTEXT-15）排最前
 
 
 def test_rerank_small_pool_passthrough():

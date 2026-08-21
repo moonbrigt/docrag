@@ -1,6 +1,6 @@
 """真实模型全链路评测：bge-m3 + bge-reranker-v2-m3 + 真实 LLM。
 
-四路变体：bm25_real_llm / hybrid_real_llm / hybrid_lexical_llm / hybrid_rerank_llm。
+五路变体见 all_variants；hybrid_rerank_prod_llm 复现生产重排参数（10 候选/256 token）。
 词法重排统一用 baselines.LexicalReranker（与生产 mock 重排同实现，保证口径一致）。
 """
 from __future__ import annotations
@@ -14,6 +14,7 @@ from pathlib import Path
 
 import numpy as np
 
+from app.config import get_settings
 from app.core import llm as llm_mod
 from app.core import runtime_config
 from app.evaluation import eval_metrics, public_dataset
@@ -71,29 +72,37 @@ class RealDenseRetriever:
         return out
 
 
-# ---------------------------------------------------------------------------
-# Real bge-reranker
-# ---------------------------------------------------------------------------
 class RealReranker:
-    """bge-reranker-v2-m3 CrossEncoder 重排。"""
+    """bge-reranker-v2-m3 CrossEncoder 重排；模型懒加载（未用到的实例不占内存）。
 
-    def __init__(self, corpus: list[dict]) -> None:
-        t0 = time.time()
+    pool/max_length 复现生产重排参数（RAG_RERANK_CANDIDATES / MAX_TOKENS）；
+    默认 None = 候选全量、模型默认 512 token（§12.2 基线口径）。
+    """
+
+    def __init__(self, corpus: list[dict], max_length: int | None = None,
+                 pool: int | None = None) -> None:
         self.corpus = corpus
-        from sentence_transformers import CrossEncoder
+        self.max_length = max_length
+        self.pool = pool
+        self._model = None
 
-        self._model = CrossEncoder("BAAI/bge-reranker-v2-m3", device="cpu")
-        print(f"  [reranker] loaded in {time.time()-t0:.1f}s")
+    def _ensure(self):
+        if self._model is None:
+            t0 = time.time()
+            from sentence_transformers import CrossEncoder
+            self._model = CrossEncoder("BAAI/bge-reranker-v2-m3", device="cpu")
+            print(f"  [reranker] loaded in {time.time()-t0:.1f}s")
 
     def rerank(self, query: str, candidates: list[dict], k: int) -> list[dict]:
         if not candidates:
             return []
-        for c in candidates:
-            if "text" not in c:
-                c["text"] = self.corpus[c["chunk_index"]]["text"][:4000]
-        passages = [c["text"][:4000] for c in candidates]
+        if self.pool:
+            candidates = candidates[: self.pool]
+        self._ensure()
+        passages = [self.corpus[c["chunk_index"]]["text"][:4000] for c in candidates]
         pairs = [(query, p) for p in passages]
-        raw_scores = self._model.predict(pairs, show_progress_bar=False)
+        kwargs = {"max_length": self.max_length} if self.max_length else {}
+        raw_scores = self._model.predict(pairs, show_progress_bar=False, **kwargs)
         scored = list(zip(candidates, [float(s) for s in raw_scores]))
         scored.sort(key=lambda x: -x[1])
         return [c for c, _ in scored[:k]]
@@ -124,6 +133,10 @@ def rrf_fuse(bm25, dense, corpus, query, k, rrf_k=60):
         }
         for idx, score in ordered[:k]
     ]
+
+
+def _hybrid(bm25, dense, corpus):
+    return type("R", (), {"search": lambda self, q, k: rrf_fuse(bm25, dense, corpus, q, k)})()
 
 
 # ---------------------------------------------------------------------------
@@ -222,26 +235,26 @@ def main():
     print("\n=== 加载真实模型 ===")
     bm25 = BM25Retriever(corpus)
     real_dense = RealDenseRetriever(corpus)
-    real_reranker = RealReranker(corpus)
     lexical = LexicalReranker(corpus)
     identity = IdentityReranker()
 
     all_variants = {
         "bm25_real_llm": ("BM25 + 词法重排 + 真实 LLM", bm25, lexical),
         "hybrid_real_llm": (
-            "RRF(BM25 + bge-m3) + 无重排 + 真实 LLM",
-            type("R", (), {"search": lambda self, q, k: rrf_fuse(bm25, real_dense, corpus, q, k)})(),
-            identity,
+            "RRF(BM25 + bge-m3) + 无重排 + 真实 LLM", _hybrid(bm25, real_dense, corpus), identity,
         ),
         "hybrid_lexical_llm": (
-            "RRF(BM25 + bge-m3) + 词法重排 + 真实 LLM",
-            type("R", (), {"search": lambda self, q, k: rrf_fuse(bm25, real_dense, corpus, q, k)})(),
-            lexical,
+            "RRF(BM25 + bge-m3) + 词法重排 + 真实 LLM", _hybrid(bm25, real_dense, corpus), lexical,
         ),
         "hybrid_rerank_llm": (
-            "RRF(BM25 + bge-m3) + bge-reranker + 真实 LLM",
-            type("R", (), {"search": lambda self, q, k: rrf_fuse(bm25, real_dense, corpus, q, k)})(),
-            real_reranker,
+            "RRF(BM25 + bge-m3) + bge-reranker + 真实 LLM", _hybrid(bm25, real_dense, corpus),
+            RealReranker(corpus),
+        ),
+        "hybrid_rerank_prod_llm": (
+            "RRF(BM25 + bge-m3) + bge-reranker(生产参数) + 真实 LLM",
+            _hybrid(bm25, real_dense, corpus),
+            RealReranker(corpus, max_length=get_settings().RERANK_MAX_TOKENS,
+                         pool=get_settings().RERANK_CANDIDATES),
         ),
     }
 

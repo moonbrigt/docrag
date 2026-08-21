@@ -66,7 +66,7 @@
 - chat SSE 全链路（stage/delta/citation/done）：引用页码 3/44/26/7/9 均为 AI RMF 相关章节，citation 含真实 bbox 与 snippet
 - 结论：**Docling 真实解析 = VERIFIED**（CPU，48 页 + TableFormer 首次含模型下载约 506MB，全流程约 8 分钟）；bge-m3 嵌入与对话分别走 Ollama 本地模型已验证；bge-reranker-v2-m3 真实 CrossEncoder 已于 2026-08-21 在消融评测中加载验证（见下条）
 - 真实模型全链路消融（2026-08-21，`backend/app/evaluation/real_full_runner.py`）：bge-m3（FlagEmbedding 本地权重）+ bge-reranker-v2-m3（CrossEncoder，CPU）+ 真实云端 LLM 四变体消融，18 题全跑通；hybrid_rerank_llm recall@5 0.9375 / MRR 0.9062 / answer EM 0.333 / unanswerable 1.0；词法 vs 神经重排同口径对比：词法零增益（MRR 持平 0.752）、神经 +0.154；检索指标跨 run 一致（确定性成立），报告 `work/real_full_report.json` + `work/real_full_lexical.json`（数字与边界见 BENCHMARK_CARD §12）
-- **生产运行时切换全真实配置**（2026-08-21）：runtime_config = docling 解析 + Ollama bge-m3 嵌入 + bge-reranker-v2-m3 重排 + 云端 LLM；端到端 chat 实测（WSL、热缓存、真实 trace）：检索 2.9s + 重排 7.7s（候选 10 × 256 token）+ 生成 12.7s ≈ 23s 总延迟，SSE 全事件流（stage/delta/citation/done）正常，引用含真实 page/bbox；`/config/backends` 三后端 ready=true
+- **生产运行时切换全真实配置**（2026-08-21）：runtime_config = docling 解析 + Ollama bge-m3 嵌入 + bge-reranker-v2-m3 重排 + 云端 LLM；重排参数经评测校准（候选池 15、token 256，BENCHMARK_CARD §12.5 隔离实验）；端到端 chat 实测（WSL、热缓存、真实 trace）：检索 0.2s + 重排 11.4s + 生成 12~31s（云端波动），SSE 全事件流（stage/delta/citation/done）正常，引用含真实 page/bbox；`/config/backends` 三后端 ready=true；Docling 新文档解析验证（48 页 → 72 块，bbox 100%/section 71 覆盖，与既有 Docling 解析逐字段一致）
 
 ## 5. 已知问题清单（2026-08-20 核对）
 
