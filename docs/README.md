@@ -70,7 +70,7 @@
 
 | Method | Path | 说明 |
 |--------|------|------|
-| POST | /documents | 上传 PDF，触发异步索引流水线（202 + document_id + status=queued，带租户/属主/组） |
+| POST | /documents | 上传 PDF，触发异步索引流水线（202 + document_id + status=queued，带租户/属主/组）；同 sha 内容已存在（active 且非 failed/cancelled）→ 409 带既有文件名 |
 | GET | /documents | 文档列表（ACL 可见性过滤，含状态/页数/分块数/ACL/版本字段） |
 | GET | /documents/{id} | 文档详情 + 分块预览（ACL 过滤，无权限 404） |
 | DELETE | /documents/{id} | 删除文档并清理向量/FTS/文件（204；仅属主/管理员） |
@@ -121,6 +121,7 @@
 | 22 | 2026-08-21 词法 vs 神经重排同口径对比 | §12.4 遗留「词法/神经重排相对优劣」未验证；发现初版 bm25_real_llm 误用 Jaccard 词法重排（口径 bug） | runner 词法重排统一为 `baselines.LexicalReranker`（与生产 mock 同实现），新增 hybrid_lexical_llm 变体并重跑 bm25；结论（BENCHMARK_CARD §12.3）：词法重排在 hybrid 池零增益（MRR 持平 0.752），神经重排 MRR +0.154；bm25 口径修正后与 mock 基线 MRR 0.7469 完全一致（检索确定性跨模型验证） |
 | 23 | 2026-08-21 生产切换真实重排 + docling 解析 | 用户要求弃用 mock（词法重排已证零增益）；生产重排存在两处问题：喂给模型的是 200 字符 snippet（信号不足）、候选池为 RRF 融合全量（最多 40 对，CPU 全文 512 token 重排不可用） | runtime_config 切 rerank=bge-reranker-v2-m3 + parse=docling；rerank_service 改为 chunk_repo 回查全文 + 候选截断（`RERANK_CANDIDATES=10`）；core/reranker score 传 `max_length=RERANK_MAX_TOKENS=256`；端到端实测（WSL 热缓存）：检索 2.9s + 重排 7.7s + 生成 12.7s ≈ 23s，引用 page/bbox 正常；新增 test_rerank_service（截断+全文断言），109 passed |
 | 24 | 2026-08-21 生产重排参数校准（候选池 10→15） | §12.2 基线口径（15 候选/512 token）与生产参数（10/256）不同，延迟优化未验证质量；实测 10/256 recall@5 0.875 / MRR 0.787，显著低于基线 | 新增 hybrid_rerank_prod_llm 变体（读 RAG_RERANK_* 配置，env 可覆盖）跑隔离实验（BENCHMARK_CARD §12.5）：候选池 10 是 recall@5 掉点主因（gold 被截在 RRF 第 11-15 位），token 256 损失 top-1 精度；定标 `RERANK_CANDIDATES=15`（recall@5 恢复 0.9375，生产重排 11.4s）；384 边际收益不值 +7.5s |
+| 25 | 2026-08-21 上传内容去重（POST /documents 409） | sha256 已落库但从不校验：同一 PDF 重复上传产生多份同内容文档，检索同内容重复命中（当日实际发生，手动清理 3 条残留） | document_repo 新增 find_active_by_sha（active 且排除 failed/cancelled——死行不挡重新上传）；document_service.find_duplicate 做租户 + 可见性过滤（不可见的重复不 409，fail-closed 不泄露存在性）；路由 sha 命中即 409 带既有文件名与状态；前端 parseError 补读 `detail` 字段（FastAPI 错误体口径，此前所有后端错误信息降级为通用文案）；新增 test_upload_duplicate_409，110 passed |
 
 ## 6. 文档维护规则（防止再次漂移）
 

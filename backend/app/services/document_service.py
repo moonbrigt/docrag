@@ -66,6 +66,15 @@ async def list_documents(principal: auth.Principal) -> list[dict]:
     return [r for r in rows if auth.doc_visible(principal, r)]
 
 
+async def find_duplicate(sha256: str, principal: auth.Principal) -> dict | None:
+    """上传去重：同租户、对当前身份可见、仍在服役的同内容文档；不存在返回 None。
+
+    不可见的重复不返回（fail-closed：不泄露无权文档的存在性）。
+    """
+    rows = await document_repo.find_active_by_sha(sha256, principal.tenant_id)
+    return next((r for r in rows if auth.doc_visible(principal, r)), None)
+
+
 async def get_chunks(doc_id: str) -> list[dict]:
     return await chunk_repo.list_chunks_by_doc(doc_id)
 

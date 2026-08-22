@@ -10,9 +10,10 @@ PDF_BYTES = b"%PDF-1.4\n% fake pdf for offline test\n"
 
 
 def _upload(client, filename="sample.pdf", headers=None):
+    # 字节含文件名：同用例多次上传时 sha 唯一（内容去重不误伤）
     r = client.post(
         "/api/v1/documents",
-        files={"file": (filename, PDF_BYTES, "application/pdf")},
+        files={"file": (filename, PDF_BYTES + filename.encode(), "application/pdf")},
         headers=headers,
     )
     assert r.status_code == 202, r.text

@@ -24,8 +24,8 @@ interface JsonOptions {
 export async function parseError(res: Response): Promise<string> {
   let msg = `请求失败（${res.status}）`;
   try {
-    const body = (await res.json()) as { message?: string };
-    if (body?.message) msg = body.message;
+    const body = (await res.json()) as { message?: string; detail?: string };
+    msg = body?.message ?? body?.detail ?? msg;
   } catch {
     /* 忽略非 JSON 响应体 */
   }

@@ -74,7 +74,7 @@
 
 | Method | Path | 功能 | 认证 | 请求体 | 响应体 |
 |--------|------|------|------|--------|--------|
-| POST | /documents | 上传 PDF，触发解析+分块+索引流水线 | 否 | multipart: file | 202 + document_id + 初始状态 |
+| POST | /documents | 上传 PDF，触发解析+分块+索引流水线 | 否 | multipart: file | 202 + document_id + 初始状态；同租户同 sha 仍在服役的文档存在时 409（2026-08-21 记录） |
 | GET | /documents | 文档列表（含状态/页数/分块数） | 否 | - | Document[] |
 | GET | /documents/{id} | 文档详情 + 分块预览 | 否 | - | Document + Chunk[] |
 | DELETE | /documents/{id} | 删除文档并清理向量/FTS | 否 | - | 204 |

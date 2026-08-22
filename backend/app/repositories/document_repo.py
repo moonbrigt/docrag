@@ -178,6 +178,20 @@ async def list_active_ids(tenant_id: str) -> list[dict]:
     return [_row_to_doc(r) for r in rows]
 
 
+async def find_active_by_sha(sha256: str, tenant_id: str | None) -> list[dict]:
+    """同租户内 sha 相同且仍在服役（active 且未 failed/cancelled）的文档。"""
+    sql = (
+        _SELECT_DOC
+        + "WHERE d.sha256=? AND d.is_active=1 "
+        + "AND d.status NOT IN ('failed','cancelled')"
+    )
+    if tenant_id is None:
+        rows = db.query(sql, (sha256,))
+    else:
+        rows = db.query(sql + " AND d.tenant_id=?", (sha256, tenant_id))
+    return [_row_to_doc(r) for r in rows]
+
+
 async def list_by_statuses(statuses: tuple[str, ...]) -> list[dict]:
     ph = ",".join("?" * len(statuses))
     rows = db.query(_SELECT_DOC + f"WHERE d.status IN ({ph})", tuple(statuses))

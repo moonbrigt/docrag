@@ -40,6 +40,27 @@ def test_upload_pipeline_indexed(client):
         assert isinstance(ch["page_no"], int) and ch["page_no"] >= 1
 
 
+def test_upload_duplicate_409(client):
+    """同内容重复上传被拒（409 带既有文档名）；不同内容正常 202。"""
+    from conftest import wait_indexed
+
+    doc_id = _upload(client)
+    wait_indexed(client, doc_id)
+
+    dup = client.post(
+        "/api/v1/documents",
+        files={"file": ("again.pdf", PDF_BYTES, "application/pdf")},
+    )
+    assert dup.status_code == 409, dup.text
+    assert "sample.pdf" in dup.json()["detail"]
+
+    fresh = client.post(
+        "/api/v1/documents",
+        files={"file": ("other.pdf", PDF_BYTES + b"v2", "application/pdf")},
+    )
+    assert fresh.status_code == 202, fresh.text
+
+
 def test_detail_404(client):
     r = client.get("/api/v1/documents/nonexistent-id")
     assert r.status_code == 404

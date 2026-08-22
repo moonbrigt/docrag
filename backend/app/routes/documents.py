@@ -35,13 +35,20 @@ async def upload_document(
     if not data:
         raise HTTPException(status_code=400, detail="上传文件为空")
     filename = file.filename or "upload.pdf"
+    sha = pipeline_service.sha256_bytes(data)
+    dup = await document_service.find_duplicate(sha, principal)
+    if dup:
+        raise HTTPException(
+            status_code=409,
+            detail=f"内容重复：{dup['filename']} 已存在（状态 {dup['status']}）",
+        )
     pathlib.Path(_settings.DATA_DIR).mkdir(parents=True, exist_ok=True)
     doc_id = document_repo.new_id()
     pdf_path = pathlib.Path(_settings.DATA_DIR) / f"{doc_id}.pdf"
     await document_repo.insert_document(
         doc_id=doc_id,
         filename=filename,
-        sha256=pipeline_service.sha256_bytes(data),
+        sha256=sha,
         page_count=0,
         status="queued",
         file_path=str(pdf_path),
