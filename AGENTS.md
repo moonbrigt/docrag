@@ -83,8 +83,6 @@ docrag/                        # 仓库根（WSL: /home/z1050/Projects/docrag）
 ## 已知薄弱点（修 bug 优先清单）
 
 - 真实模型链路：**生产 runtime_config 已全真实**（2026-08-21 切换）——docling 解析 + Ollama bge-m3 嵌入 + bge-reranker-v2-m3 重排 + 云端 LLM；端到端 chat 实测（WSL、热缓存）：检索 0.2s + 重排 11.4s + 生成 12~31s。重排参数经评测校准（BENCHMARK_CARD §12.5）：候选池 `RERANK_CANDIDATES=15`（10 会截掉 RRF 第 11-15 位的 gold chunk，recall@5 0.9375→0.875）+ `RERANK_MAX_TOKENS=256`（384 再买回一半 top-1 精度但生产延迟 +7.5s，不值）；重排用全文而非 snippet。词法重排已证明零增益（MRR 持平 0.752），mock 重排仅作离线兜底
-- 前端无自动化测试（可补 vitest + testing-library，优先覆盖 CitationChip 引用跳转与 SSE 解析）
-- 后端测试只覆盖 smoke（health/documents）与评测；`chat` SSE 流、删除同步、双后端切换无专门测试
 - 评测指标已闭环：mock 基线 MRR 0.7469；真实全链路（bge-m3 + bge-reranker + 真实 LLM）recall@5 0.9375 / MRR 0.9062 / answer EM 0.333（BENCHMARK_CARD §12）
 - 单 SQLite 连接 + asyncio.Lock 串行化写（高并发写入场景已知限制，见 backend/README §8）
 
